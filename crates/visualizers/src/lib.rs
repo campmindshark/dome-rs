@@ -716,6 +716,50 @@ fn phase_offset(beat_progress: f64) -> usize {
 }
 
 #[cfg(test)]
+fn frame_hash(commands: &[DomeCommand]) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    for command in commands {
+        match command {
+            DomeCommand::Flush => hash_byte(&mut hash, 0),
+            DomeCommand::Frame(colors) => {
+                hash_byte(&mut hash, 1);
+                for color in colors {
+                    hash_byte(&mut hash, color.r);
+                    hash_byte(&mut hash, color.g);
+                    hash_byte(&mut hash, color.b);
+                }
+            }
+            DomeCommand::Pixel {
+                strut_index,
+                led_index,
+                color,
+            } => {
+                hash_byte(&mut hash, 2);
+                hash_usize(&mut hash, *strut_index);
+                hash_usize(&mut hash, *led_index);
+                hash_byte(&mut hash, color.r);
+                hash_byte(&mut hash, color.g);
+                hash_byte(&mut hash, color.b);
+            }
+        }
+    }
+    hash
+}
+
+#[cfg(test)]
+fn hash_byte(hash: &mut u64, byte: u8) {
+    *hash ^= u64::from(byte);
+    *hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+}
+
+#[cfg(test)]
+fn hash_usize(hash: &mut u64, value: usize) {
+    for byte in value.to_le_bytes() {
+        hash_byte(hash, byte);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use domers_outputs::{topology::DOME_PIXELS, DomeCommand};
 
@@ -828,6 +872,37 @@ mod tests {
             })
             .expect("tv static should write a frame");
         assert!(frame.windows(2).take(100).any(|pair| pair[0] != pair[1]));
+    }
+
+    #[test]
+    fn live_visualizer_frame_hashes_are_stable() {
+        let cases = [
+            (LiveVisualizer::TvStatic, 14_075_851_066_622_254_809),
+            (LiveVisualizer::Volume, 8_043_719_800_834_997_594),
+            (LiveVisualizer::Flash, 17_092_067_869_950_253_262),
+            (LiveVisualizer::Radial, 69_789_995_642_437_042),
+            (LiveVisualizer::Splat, 1_790_059_931_600_538_683),
+            (LiveVisualizer::Race, 12_074_785_084_243_685_636),
+            (LiveVisualizer::Snakes, 12_527_579_846_269_835_972),
+            (LiveVisualizer::QuaternionTest, 17_270_531_847_863_315_960),
+            (
+                LiveVisualizer::QuaternionMultiTest,
+                2_423_281_741_408_710_433,
+            ),
+            (
+                LiveVisualizer::QuaternionPaintbrush,
+                3_911_279_936_247_290_614,
+            ),
+        ];
+        let actual: Vec<_> = cases
+            .iter()
+            .map(|(visualizer, _expected)| {
+                let commands = render_dome_visualizer(*visualizer, VisualizerInput::default());
+                (*visualizer, super::frame_hash(&commands))
+            })
+            .collect();
+        let expected: Vec<_> = cases.into_iter().collect();
+        assert_eq!(actual, expected);
     }
 
     #[test]

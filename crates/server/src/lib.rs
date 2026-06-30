@@ -1253,6 +1253,7 @@ fn active_dome_visualizer_name(index: u8) -> &'static str {
         5 => "LEDDomeQuaternionMultiTestVisualizer",
         6 => "LEDDomeQuaternionPaintbrushVisualizer",
         7 => "LEDDomeSplatVisualizer",
+        8 => "LEDDomeTVStaticVisualizer",
         _ => "LEDDomeVolumeVisualizer",
     }
 }
@@ -1306,6 +1307,7 @@ const fn visualizer_from_index(index: u8) -> LiveVisualizer {
         5 => LiveVisualizer::QuaternionMultiTest,
         6 => LiveVisualizer::QuaternionPaintbrush,
         7 => LiveVisualizer::Splat,
+        8 => LiveVisualizer::TvStatic,
         _ => LiveVisualizer::Volume,
     }
 }
@@ -1404,6 +1406,17 @@ mod tests {
         let second = state.operator_frame().dome;
 
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn active_visualizer_index_eight_selects_tv_static() {
+        let mut config = DomersConfig::default();
+        config.dome.active_visualizer = 8;
+        let state = ServerState::new(config);
+
+        let frame = state.operator_frame();
+
+        assert_eq!(frame.active_visualizers, vec!["LEDDomeTVStaticVisualizer"]);
     }
 
     #[test]

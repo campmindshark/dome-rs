@@ -64,6 +64,8 @@ Expected simulator behavior:
 - `/simulator` is a dedicated simulator page
 - `/simulator` has simulator-only controls for visualizer, fake audio/beat inputs, flash overlay, and preview colors
 - changing `/simulator` controls does not patch live runtime config, shared simulator inputs, or hardware output
+- TV Static is selectable in the dome visualizer controls
+- Stage Depth is a stage-output visualizer and belongs with stage simulator controls, not the dome canvas selector
 - the live controls page starts simulator work only after opening the `Preview` drawer
 - the live `Preview` drawer mirrors the runtime frame stream used for hardware output
 - dome canvas uses runtime frame data from the server, not direct hardware sockets
