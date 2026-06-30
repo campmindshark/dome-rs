@@ -49,8 +49,8 @@ use tokio::{
 /// Engine frame interval for the 400 Hz compute cap.
 pub const ENGINE_FRAME_INTERVAL: Duration = Duration::from_micros(2_500);
 
-/// Emit a browser simulator frame roughly every 32.5 ms while the engine runs.
-pub const SIMULATOR_FRAME_STRIDE: u64 = 13;
+/// Emit a browser simulator frame roughly every 17.5 ms while the engine runs.
+pub const SIMULATOR_FRAME_STRIDE: u64 = 7;
 
 const DOME_CONTROL_BOX_PIXEL_COUNT: usize = 214 * 8;
 

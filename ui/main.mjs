@@ -82,6 +82,8 @@ const SPECTRUM_PROJECTION_SPAN = 690;
 let domeLayout;
 let domeLedPoints = [];
 let latestSimulatorFrame;
+let pendingSimulatorFrame;
+let simulatorPaintQueued = false;
 let simulatorStarted = false;
 let simulatorSocket;
 
@@ -647,9 +649,6 @@ function drawFrame(colors) {
   if (!context || !colors.length) {
     return;
   }
-
-  resizeSimulatorCanvas();
-  clearCanvas();
   context.lineWidth = 1;
 
   colors.forEach((color, index) => {
@@ -663,7 +662,6 @@ function drawPixel(command) {
     return;
   }
 
-  resizeSimulatorCanvas();
   const index = command.strut_index * 3 + command.led_index;
   const point = domeLedPoints[index] ?? fallbackDomePoint(index, 190);
   drawLed(point.x, point.y, command.color, point.size * 2);
@@ -758,21 +756,41 @@ function resizeSimulatorCanvas() {
 
 function redrawLatestSimulatorFrame() {
   if (latestSimulatorFrame) {
-    handleSimulatorFrame(latestSimulatorFrame);
+    scheduleSimulatorFrame(latestSimulatorFrame);
   } else {
     resizeSimulatorCanvas();
     clearCanvas();
   }
 }
 
-function handleSimulatorFrame(frame) {
-  latestSimulatorFrame = frame;
+function updateSimulatorMetrics(frame) {
   if (metricFrames) {
     metricFrames.textContent = String(frame.metrics.frames);
   }
   if (metricSimulatorFrames) {
     metricSimulatorFrames.textContent = String(frame.metrics.simulator_frames);
   }
+}
+
+function scheduleSimulatorFrame(frame) {
+  latestSimulatorFrame = frame;
+  pendingSimulatorFrame = frame;
+  updateSimulatorMetrics(frame);
+  if (simulatorPaintQueued) {
+    return;
+  }
+  simulatorPaintQueued = true;
+  window.requestAnimationFrame(() => {
+    simulatorPaintQueued = false;
+    const frameToDraw = pendingSimulatorFrame;
+    pendingSimulatorFrame = undefined;
+    if (frameToDraw) {
+      drawSimulatorFrame(frameToDraw);
+    }
+  });
+}
+
+function drawSimulatorFrame(frame) {
   resizeSimulatorCanvas();
   clearCanvas();
 
@@ -818,7 +836,7 @@ async function refreshState() {
   const snapshot = await request('/api/state');
   updateSnapshot(snapshot);
   if (simulatorStarted) {
-    handleSimulatorFrame(await request('/api/simulator/frame'));
+    scheduleSimulatorFrame(await request('/api/simulator/frame'));
   }
 }
 
@@ -883,7 +901,7 @@ async function refreshPreviewFrame() {
     if (isDedicatedSimulatorPage) {
       await refreshSandboxFrame();
     } else {
-      handleSimulatorFrame(await request('/api/simulator/frame'));
+      scheduleSimulatorFrame(await request('/api/simulator/frame'));
     }
   }
 }
@@ -893,7 +911,7 @@ async function refreshSandboxFrame() {
     return;
   }
   updateSandboxControlLabels();
-  handleSimulatorFrame(await request('/api/simulator/sandbox-frame', {
+  scheduleSimulatorFrame(await request('/api/simulator/sandbox-frame', {
     method: 'POST',
     body: JSON.stringify({
       active_visualizer: Number(sandboxActiveVisualizer?.value ?? 0),
@@ -932,7 +950,7 @@ async function ensureSimulatorStarted() {
     }
     await refreshSandboxFrame();
   } else {
-    handleSimulatorFrame(await request('/api/simulator/frame'));
+    scheduleSimulatorFrame(await request('/api/simulator/frame'));
     connectSimulatorStream();
   }
 }
@@ -966,7 +984,7 @@ function connectSimulatorStream() {
   });
 
   socket.addEventListener('message', event => {
-    handleSimulatorFrame(JSON.parse(event.data));
+    scheduleSimulatorFrame(JSON.parse(event.data));
   });
 
   socket.addEventListener('close', () => {

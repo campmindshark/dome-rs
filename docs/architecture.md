@@ -53,7 +53,7 @@ HTTP and WebSocket surface:
 
 - Engine target: 400 Hz compute cap.
 - OPC target: independent 200 Hz send cap.
-- Browser simulator: throttled stream derived from engine frames.
+- Browser simulator: throttled stream derived from engine frames, targeting roughly one browser paint per display frame while the preview is open.
 
 Timing tests use this shape:
 
