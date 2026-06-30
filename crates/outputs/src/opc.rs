@@ -5,6 +5,36 @@
 
 use domers_core::Rgb;
 
+/// Dense persistent channel buffer matching Spectrum's flush semantics.
+#[derive(Clone, Debug, Default)]
+pub struct PersistentChannel {
+    next: Vec<Rgb>,
+    current: Vec<Rgb>,
+}
+
+impl PersistentChannel {
+    /// Set a pixel in the next frame.
+    pub fn set_pixel(&mut self, index: usize, color: Rgb) {
+        let needed = index + 1;
+        if self.next.len() < needed {
+            self.next.resize(needed, Rgb::BLACK);
+        }
+        self.next[index] = color;
+    }
+
+    /// Realize the next frame and preserve pixels for future sparse updates.
+    pub fn flush(&mut self) {
+        self.current.clone_from(&self.next);
+        self.next.clone_from(&self.current);
+    }
+
+    /// Encode the realized current frame.
+    #[must_use]
+    pub fn encode_current(&self, channel: u8) -> Vec<u8> {
+        encode_frame(channel, &self.current)
+    }
+}
+
 /// Encode one non-standard Spectrum OPC frame chunk.
 ///
 /// # Panics
@@ -31,7 +61,7 @@ pub fn encode_frame(channel: u8, pixels: &[Rgb]) -> Vec<u8> {
 mod tests {
     use domers_core::Rgb;
 
-    use super::encode_frame;
+    use super::{encode_frame, PersistentChannel};
 
     #[test]
     fn encodes_spectrum_nonstandard_header_without_magic_prefix() {
@@ -49,5 +79,21 @@ mod tests {
         );
         let encoded = encode_frame(2, &[Rgb::from_u24(0x12_34_56), Rgb::from_u24(0xaa_bb_cc)]);
         assert_eq!(encoded.as_slice(), expected);
+    }
+
+    #[test]
+    fn persistent_channel_carries_forward_sparse_updates() {
+        let mut channel = PersistentChannel::default();
+        channel.set_pixel(0, Rgb::from_u24(0xff_00_00));
+        channel.set_pixel(1, Rgb::from_u24(0x00_ff_00));
+        channel.flush();
+
+        channel.set_pixel(1, Rgb::from_u24(0x00_00_ff));
+        channel.flush();
+
+        assert_eq!(
+            channel.encode_current(0),
+            vec![0, 0, 0, 6, 0xff, 0, 0, 0, 0, 0xff]
+        );
     }
 }
