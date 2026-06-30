@@ -46,6 +46,8 @@ for (const marker of [
   'id="metric-simulator-frames"',
   'id="dome-simulator"',
   'data-frame-source="websocket"',
+  'max-width: calc(100vw - 2rem)',
+  'width: 100%',
 ]) {
   if (!html.includes(marker)) {
     console.error(`Missing required UI marker: ${marker}`);
@@ -68,6 +70,9 @@ for (const marker of [
   'buildDomeLedPoints',
   'domeStrutLedCounts',
   'function drawLed',
+  'SPECTRUM_CANVAS_SIZE',
+  'resizeSimulatorCanvas',
+  'window.addEventListener(\'resize\'',
 ]) {
   if (!js.includes(marker)) {
     console.error(`Missing required API marker: ${marker}`);

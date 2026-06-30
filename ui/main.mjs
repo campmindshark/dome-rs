@@ -16,7 +16,12 @@ const metricFrames = document.querySelector('#metric-frames');
 const metricSimulatorFrames = document.querySelector('#metric-simulator-frames');
 const canvas = document.querySelector('#dome-simulator');
 const context = canvas?.getContext('2d');
+const SPECTRUM_CANVAS_SIZE = 750;
+const SPECTRUM_PROJECTION_OFFSET = 10;
+const SPECTRUM_PROJECTION_SPAN = 690;
+let domeLayout;
 let domeLedPoints = [];
+let latestSimulatorFrame;
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -34,7 +39,8 @@ async function loadDomeLayout() {
     request('/api/dome/geometry'),
     request('/api/dome/mapping'),
   ]);
-  domeLedPoints = buildDomeLedPoints(geometry, mapping);
+  domeLayout = { geometry, mapping };
+  rebuildDomeLedPoints();
 }
 
 function updateSnapshot(snapshot) {
@@ -74,6 +80,7 @@ function drawFrame(colors) {
     return;
   }
 
+  resizeSimulatorCanvas();
   clearCanvas();
   context.lineWidth = 1;
 
@@ -88,6 +95,7 @@ function drawPixel(command) {
     return;
   }
 
+  resizeSimulatorCanvas();
   const index = command.strut_index * 3 + command.led_index;
   const point = domeLedPoints[index] ?? fallbackDomePoint(index, 190);
   drawLed(point.x, point.y, command.color, point.size * 2);
@@ -120,6 +128,10 @@ function fallbackDomePoint(index, total) {
 function buildDomeLedPoints(geometry, mapping) {
   const ledCounts = domeStrutLedCounts(mapping);
   const points = [];
+  const scale = canvas.width / SPECTRUM_CANVAS_SIZE;
+  const offset = SPECTRUM_PROJECTION_OFFSET * scale;
+  const span = SPECTRUM_PROJECTION_SPAN * scale;
+  const ledSize = Math.max(1, Math.round(scale));
 
   for (let strut = 0; strut < geometry.lines.length; strut += 1) {
     const line = geometry.lines[strut];
@@ -129,9 +141,9 @@ function buildDomeLedPoints(geometry, mapping) {
     for (let led = 0; led < leds; led += 1) {
       const d = (led + 1) / (leds + 2);
       points.push({
-        x: 10 + ((end.normalized_x - start.normalized_x) * d + start.normalized_x) * 690,
-        y: 10 + ((end.normalized_y - start.normalized_y) * d + start.normalized_y) * 690,
-        size: 1,
+        x: offset + ((end.normalized_x - start.normalized_x) * d + start.normalized_x) * span,
+        y: offset + ((end.normalized_y - start.normalized_y) * d + start.normalized_y) * span,
+        size: ledSize,
       });
     }
   }
@@ -152,9 +164,44 @@ function domeStrutLedCounts(mapping) {
   });
 }
 
+function rebuildDomeLedPoints() {
+  if (!domeLayout) {
+    return;
+  }
+  domeLedPoints = buildDomeLedPoints(domeLayout.geometry, domeLayout.mapping);
+}
+
+function resizeSimulatorCanvas() {
+  if (!canvas || !context) {
+    return false;
+  }
+
+  const rect = canvas.getBoundingClientRect();
+  const size = Math.max(320, Math.round(rect.width || SPECTRUM_CANVAS_SIZE));
+  if (canvas.width === size && canvas.height === size) {
+    return false;
+  }
+
+  canvas.width = size;
+  canvas.height = size;
+  rebuildDomeLedPoints();
+  return true;
+}
+
+function redrawLatestSimulatorFrame() {
+  if (latestSimulatorFrame) {
+    handleSimulatorFrame(latestSimulatorFrame);
+  } else {
+    resizeSimulatorCanvas();
+    clearCanvas();
+  }
+}
+
 function handleSimulatorFrame(frame) {
+  latestSimulatorFrame = frame;
   metricFrames.textContent = String(frame.metrics.frames);
   metricSimulatorFrames.textContent = String(frame.metrics.simulator_frames);
+  resizeSimulatorCanvas();
   clearCanvas();
 
   for (const command of frame.commands) {
@@ -245,6 +292,8 @@ for (const input of [
     await patchSimulatorControls();
   });
 }
+
+window.addEventListener('resize', redrawLatestSimulatorFrame);
 
 await loadDomeLayout();
 await refreshState();

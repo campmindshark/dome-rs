@@ -9,11 +9,17 @@
         background: #111;
         color: #eee;
         font-family: system-ui, sans-serif;
-        margin: 2rem;
+        margin: 1rem;
       }
       canvas {
+        aspect-ratio: 1 / 1;
         background: #000;
         border: 1px solid #555;
+        box-sizing: border-box;
+        display: block;
+        height: auto;
+        max-width: calc(100vw - 2rem);
+        width: 100%;
       }
       output,
       .metric {
