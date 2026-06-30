@@ -1,0 +1,22 @@
+---
+description: Require README documentation for workspace crates
+globs: crates/*/Cargo.toml
+alwaysApply: false
+---
+
+# Crate README Requirement
+
+Every workspace crate under `crates/` must have a sibling `README.md`.
+
+When creating or renaming a crate:
+
+- Add or update `crates/<crate>/README.md`.
+- Include the crate purpose, responsibilities, key files, and test command.
+- Add or update the crate link in the root `README.md` **Crates** section.
+
+Example:
+
+```text
+crates/example/Cargo.toml
+crates/example/README.md
+```

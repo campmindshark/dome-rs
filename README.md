@@ -96,6 +96,16 @@ cargo test --workspace
 node ui/check.mjs
 ```
 
+## Crates
+
+- [`domers-core`](crates/core/README.md): shared config, color, beat, and migration domain types.
+- [`domers-engine`](crates/engine/README.md): deterministic operator scheduling rules.
+- [`domers-inputs`](crates/inputs/README.md): fakeable audio, MIDI, Madmom, and orientation input helpers.
+- [`domers-outputs`](crates/outputs/README.md): output commands, simulator sinks, topology helpers, and OPC transport.
+- [`domers-server`](crates/server/README.md): runtime state, HTTP/WebSocket API, input tasks, simulator frames, and hardware output.
+- [`domers-visualizers`](crates/visualizers/README.md): dome/bar/stage visualizer and diagnostic renderers.
+- [`domers-test-support`](crates/test-support/README.md): shared test helpers and fixture smoke checks.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)
