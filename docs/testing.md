@@ -19,9 +19,10 @@ node ui/check.mjs
 - Simulator command emission with hardware disabled, including dome/bar/stage preview streams.
 - Fake audio, MIDI, orientation, and Madmom beat inputs.
 - Live UDP audio/MIDI/orientation adapter parsing and runtime lifecycle ingestion.
-- MIDI binding actions and MIDI log state.
+- Audio device identity/all-endpoint index mapping and Madmom audio-index derivation.
+- MIDI device-scoped command state, wildcard/exact binding actions, MIDI log state, and Spectrum knob math.
 - Orientation datagram parsing, device state, calibration, action flags, poi speed, and stale-device removal.
-- Madmom sidecar launch argument, disabled-lifecycle behavior, managed stdout ingestion path, and fake-sidecar runtime test.
+- Madmom sidecar launch argument, disabled-lifecycle behavior, managed stdout ingestion path, derived audio input index, and fake-sidecar runtime test.
 - Spectrum-compatible 64-entry palette indexing and gradient blending.
 - Shared-entry palette TOML serialization, parsing, and XML import golden output.
 - Visualizer simulator-frame harness and frame-hash snapshots for live dome modes.

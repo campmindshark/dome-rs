@@ -123,6 +123,47 @@
       <details id="config-drawer" aria-label="Config Editor">
         <summary>Config Editor</summary>
         <p>Edit the full native configuration as JSON. Applying config restarts live input adapters when the engine is running.</p>
+        <fieldset>
+          <legend>Input And Tempo Config</legend>
+          <label>
+            Audio UDP bind
+            <input id="config-audio-bind" name="configAudioBind" type="text" />
+          </label>
+          <label>
+            Audio device ID
+            <input id="config-audio-device-id" name="configAudioDeviceId" type="text" />
+          </label>
+          <label>
+            MIDI UDP bind
+            <input id="config-midi-bind" name="configMidiBind" type="text" />
+          </label>
+          <label>
+            Orientation UDP bind
+            <input id="config-orientation-bind" name="configOrientationBind" type="text" />
+          </label>
+          <label>
+            Tempo source
+            <select id="config-tempo-source" name="configTempoSource">
+              <option value="human">Human</option>
+              <option value="madmom">Madmom</option>
+              <option value="link_unsupported">Link unsupported</option>
+            </select>
+          </label>
+          <label>
+            Madmom command
+            <input id="config-madmom-command" name="configMadmomCommand" type="text" />
+          </label>
+          <label>
+            Madmom tracker
+            <input id="config-madmom-tracker" name="configMadmomTracker" type="text" />
+          </label>
+          <label>
+            Madmom audio input index
+            <input id="config-madmom-audio-index" name="configMadmomAudioIndex" type="number" min="0" />
+          </label>
+          <button id="apply-structured-config" type="button">Apply Structured Config</button>
+          <p>MIDI bindings: <span id="config-midi-bindings">none</span></p>
+        </fieldset>
         <div>
           <button id="reload-config" type="button">Reload Config</button>
           <button id="apply-config" type="button">Apply Config</button>
@@ -174,7 +215,12 @@
       <details id="inputs-drawer" aria-label="Inputs">
         <summary>Inputs</summary>
         <button id="tap-tempo" type="button">Tap Tempo</button>
+        <button id="reset-tempo" type="button">Reset Tempo</button>
         <button id="orientation-calibrate" type="button">Calibrate Orientation</button>
+        <p>
+          BPM: <span id="tempo-bpm">[none]</span>
+          Tap counter: <span id="tap-counter">Tap</span>
+        </p>
         <div class="status-grid">
           <p class="target-status">
             <strong>Audio</strong>

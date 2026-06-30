@@ -79,6 +79,7 @@ source = "human"
 flash_speed = 0.0
 
 [inputs.audio]
+device_id = "{0.0.1.00000000}.{1ce71263-2eb5-4744-94e7-5bc353f90945}"
 
 [[inputs.midi.bindings]]
 command_kind = "note"

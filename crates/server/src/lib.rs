@@ -18,8 +18,10 @@ use domers_core::{
 };
 use domers_engine::{schedule_operator_frame, FullVisualizerSpec, InputSpec, OutputSpec};
 use domers_inputs::{
-    parse_beat_line, parse_midi_payload, parse_volume_payload, MadmomLaunchConfig, MidiCommand,
-    MidiCommandKind, OrientationDevice, OrientationInputState, OrientationQuaternion,
+    capture_devices_from_all_endpoints, current_audio_device_index, parse_beat_line,
+    parse_midi_payload, parse_volume_payload, AudioDeviceFlow, EnumeratedAudioEndpoint,
+    MadmomLaunchConfig, MidiCommand, MidiCommandKind, OrientationDevice, OrientationInputState,
+    OrientationQuaternion,
 };
 use domers_outputs::{
     apply_bar_commands, apply_dome_commands, apply_stage_commands, BarCommand, DomeCommand,
@@ -100,10 +102,16 @@ pub struct InputStatus {
     pub volume: Option<f32>,
     /// Current beat length in milliseconds, if known.
     pub beat_ms: Option<u64>,
+    /// Spectrum-style BPM display.
+    pub bpm: String,
     /// Current beat progress in `[0.0, 1.0)`.
     pub beat_progress: f64,
     /// Number of tap-tempo taps accepted.
     pub taps: u64,
+    /// Spectrum-style tap counter text.
+    pub tap_counter_text: String,
+    /// Whether the tap counter should be highlighted as active.
+    pub tap_counter_active: bool,
     /// Number of parsed Madmom beat lines accepted.
     pub madmom_beats: u64,
     /// Number of MIDI commands applied.
@@ -520,6 +528,13 @@ impl ServerState {
         self.inputs.beat.add_tap(self.now_ms());
     }
 
+    /// Reset tempo state.
+    pub fn reset_tempo(&mut self) {
+        self.inputs.beat.reset();
+        self.inputs.taps = 0;
+        self.inputs.madmom_beats = 0;
+    }
+
     /// Parse and record a Madmom `BEAT:` stdout line.
     pub fn report_madmom_line(&mut self, line: &str) -> bool {
         if let Some(beat_ms) = parse_beat_line(line) {
@@ -738,8 +753,11 @@ impl ServerState {
         InputStatus {
             volume: self.inputs.volume,
             beat_ms: self.inputs.beat.beat_ms(),
+            bpm: self.inputs.beat.bpm_string(),
             beat_progress: self.inputs.beat.progress(self.now_ms(), 1.0),
             taps: self.inputs.taps,
+            tap_counter_text: self.inputs.beat.tap_counter_text(self.now_ms()),
+            tap_counter_active: self.inputs.beat.tap_counter_active(self.now_ms()),
             madmom_beats: self.inputs.madmom_beats,
             midi_commands: self.inputs.midi_commands,
             midi_log: self.inputs.midi_log.iter().cloned().collect(),
@@ -784,7 +802,11 @@ enum InputAdapter {
 }
 
 fn midi_binding_matches(binding: &MidiBindingConfig, command: MidiCommand) -> bool {
-    binding.index == command.index && midi_kind_matches(binding.command_kind, command.kind)
+    binding
+        .device_index
+        .map_or(true, |device_index| device_index == command.device_index)
+        && binding.index == command.index
+        && midi_kind_matches(binding.command_kind, command.kind)
 }
 
 fn midi_kind_matches(binding: MidiBindingCommandKind, command: MidiCommandKind) -> bool {
@@ -863,6 +885,7 @@ impl AppRuntime {
             .route("/api/config/diagnostics", patch(patch_diagnostics))
             .route("/api/config/palette", patch(patch_palette_entry))
             .route("/api/input/tap", post(tap_tempo))
+            .route("/api/input/tempo/reset", post(reset_tempo))
             .route(
                 "/api/input/orientation/calibrate",
                 post(calibrate_orientation),
@@ -947,7 +970,7 @@ impl AppRuntime {
             tasks.push(spawn_orientation_udp_task(self.state.clone(), bind.clone()));
         }
         if matches!(config.tempo.source, TempoSource::Madmom) {
-            tasks.push(spawn_madmom_task(self.state.clone(), config.madmom.clone()));
+            tasks.push(spawn_madmom_task(self.state.clone(), config.clone()));
         }
     }
 
@@ -981,6 +1004,13 @@ impl AppRuntime {
     pub async fn tap_tempo(&self) -> ServerSnapshot {
         let mut state = self.state.lock().await;
         state.tap_tempo();
+        state.snapshot()
+    }
+
+    /// Reset tempo input state.
+    pub async fn reset_tempo(&self) -> ServerSnapshot {
+        let mut state = self.state.lock().await;
+        state.reset_tempo();
         state.snapshot()
     }
 
@@ -1205,15 +1235,13 @@ fn spawn_orientation_udp_task(state: Arc<Mutex<ServerState>>, bind: String) -> J
     })
 }
 
-fn spawn_madmom_task(
-    state: Arc<Mutex<ServerState>>,
-    config: domers_core::MadmomConfig,
-) -> JoinHandle<()> {
+fn spawn_madmom_task(state: Arc<Mutex<ServerState>>, config: DomersConfig) -> JoinHandle<()> {
     tokio::spawn(async move {
+        let audio_input_index = madmom_audio_input_index(&config);
         let launch = MadmomLaunchConfig {
-            command: config.command,
-            tracker: config.tracker,
-            audio_input_index: config.audio_input_index,
+            command: config.madmom.command,
+            tracker: config.madmom.tracker,
+            audio_input_index,
         };
         let mut child = match Command::new(&launch.command)
             .args(launch.args())
@@ -1263,6 +1291,29 @@ fn spawn_madmom_task(
                 .record_input_adapter_error(InputAdapter::Madmom, error.to_string());
         }
     })
+}
+
+fn madmom_audio_input_index(config: &DomersConfig) -> Option<u32> {
+    if config.madmom.audio_input_index.is_some() {
+        return config.madmom.audio_input_index;
+    }
+    let endpoints: Vec<_> = config
+        .inputs
+        .audio
+        .devices
+        .iter()
+        .map(|device| EnumeratedAudioEndpoint {
+            id: device.id.clone(),
+            name: device.name.clone(),
+            flow: match device.flow {
+                domers_core::AudioDeviceFlowConfig::Capture => AudioDeviceFlow::Capture,
+                domers_core::AudioDeviceFlowConfig::Render => AudioDeviceFlow::Render,
+            },
+        })
+        .collect();
+    let devices = capture_devices_from_all_endpoints(&endpoints);
+    let index = current_audio_device_index(config.inputs.audio.device_id.as_deref(), &devices);
+    u32::try_from(index).ok()
 }
 #[derive(Debug, Default)]
 struct HardwareOutputs {
@@ -1622,6 +1673,11 @@ async fn patch_palette_entry(
 
 async fn tap_tempo(State(runtime): State<AppRuntime>) -> Json<ServerSnapshot> {
     runtime.tap_tempo().await;
+    Json(runtime.snapshot().await)
+}
+
+async fn reset_tempo(State(runtime): State<AppRuntime>) -> Json<ServerSnapshot> {
+    runtime.reset_tempo().await;
     Json(runtime.snapshot().await)
 }
 
@@ -2063,8 +2119,8 @@ mod tests {
     };
 
     use domers_core::{
-        DomersConfig, MidiBindingAction, MidiBindingCommandKind, MidiBindingConfig, PaletteEntry,
-        TempoSource, UdpInputConfig,
+        AudioDeviceConfig, AudioDeviceFlowConfig, DomersConfig, MidiBindingAction,
+        MidiBindingCommandKind, MidiBindingConfig, PaletteEntry, TempoSource, UdpInputConfig,
     };
     use domers_inputs::{MidiCommand, MidiCommandKind};
     use domers_outputs::DomeCommand;
@@ -2274,11 +2330,13 @@ mod tests {
         state.apply_audio_volume(0.33);
         state.apply_midi_commands(&[
             MidiCommand {
+                device_index: 0,
                 kind: MidiCommandKind::Note,
                 index: 64,
                 value: 0.0,
             },
             MidiCommand {
+                device_index: 0,
                 kind: MidiCommandKind::ControlChange,
                 index: 1,
                 value: 0.5,
@@ -2316,18 +2374,21 @@ mod tests {
         let mut config = DomersConfig::default();
         config.inputs.midi.bindings = vec![
             MidiBindingConfig {
+                device_index: None,
                 command_kind: MidiBindingCommandKind::Note,
                 index: 60,
                 action: MidiBindingAction::TapTempo,
                 target_index: None,
             },
             MidiBindingConfig {
+                device_index: None,
                 command_kind: MidiBindingCommandKind::ControlChange,
                 index: 10,
                 action: MidiBindingAction::Palette,
                 target_index: Some(6),
             },
             MidiBindingConfig {
+                device_index: None,
                 command_kind: MidiBindingCommandKind::Program,
                 index: 2,
                 action: MidiBindingAction::Visualizer,
@@ -2338,16 +2399,19 @@ mod tests {
 
         state.apply_midi_commands(&[
             MidiCommand {
+                device_index: 0,
                 kind: MidiCommandKind::Note,
                 index: 60,
                 value: 1.0,
             },
             MidiCommand {
+                device_index: 0,
                 kind: MidiCommandKind::ControlChange,
                 index: 10,
                 value: 0.5,
             },
             MidiCommand {
+                device_index: 0,
                 kind: MidiCommandKind::Program,
                 index: 2,
                 value: 1.0,
@@ -2365,14 +2429,47 @@ mod tests {
         assert_eq!(snapshot.inputs.midi_log[2].actions, ["visualizer:8"]);
     }
 
+    #[test]
+    fn madmom_audio_index_derives_from_selected_capture_device() {
+        let mut config = DomersConfig::default();
+        config.inputs.audio.device_id = Some("mic-b".to_string());
+        config.inputs.audio.devices = vec![
+            AudioDeviceConfig {
+                id: "speaker".to_string(),
+                name: "Speaker".to_string(),
+                flow: AudioDeviceFlowConfig::Render,
+            },
+            AudioDeviceConfig {
+                id: "mic-a".to_string(),
+                name: "Mic A".to_string(),
+                flow: AudioDeviceFlowConfig::Capture,
+            },
+            AudioDeviceConfig {
+                id: "loopback".to_string(),
+                name: "Loopback".to_string(),
+                flow: AudioDeviceFlowConfig::Render,
+            },
+            AudioDeviceConfig {
+                id: "mic-b".to_string(),
+                name: "Mic B".to_string(),
+                flow: AudioDeviceFlowConfig::Capture,
+            },
+        ];
+
+        assert_eq!(super::madmom_audio_input_index(&config), Some(3));
+        config.madmom.audio_input_index = Some(9);
+        assert_eq!(super::madmom_audio_input_index(&config), Some(9));
+    }
+
     #[tokio::test]
     async fn runtime_udp_input_adapters_feed_live_state() {
         let audio_addr = free_udp_addr();
         let midi_addr = free_udp_addr();
         let orientation_addr = free_udp_addr();
         let mut config = DomersConfig::default();
-        config.inputs.audio = UdpInputConfig {
+        config.inputs.audio = domers_core::AudioInputConfig {
             bind: Some(audio_addr.to_string()),
+            ..domers_core::AudioInputConfig::default()
         };
         config.inputs.midi = domers_core::MidiInputConfig {
             bind: Some(midi_addr.to_string()),

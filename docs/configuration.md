@@ -102,6 +102,17 @@ to enable a bridge input when `domers run` starts:
 ```toml
 [inputs.audio]
 bind = "127.0.0.1:5001" # text float payload, for example 0.42
+device_id = "{0.0.1...}" # optional stable Spectrum endpoint id
+
+[[inputs.audio.devices]]
+id = "speaker"
+name = "Speaker"
+flow = "render"
+
+[[inputs.audio.devices]]
+id = "{0.0.1...}"
+name = "Show Capture"
+flow = "capture"
 
 [inputs.midi]
 bind = "127.0.0.1:5002" # note,64,1.0 or cc,1,0.5
@@ -135,6 +146,11 @@ Supported MIDI binding actions are:
 The first no-hardware version treats UDP audio and MIDI as intentional local
 replacement transports for native device capture. Behavior above the transport
 is still exercised through automated tests.
+
+`inputs.audio.devices` is optional. When present, it models Spectrum's audio
+enumeration rule: all active endpoints receive an index, but only capture
+devices are selectable. If `madmom.audio_input_index` is unset, `domers run`
+derives the Madmom/PortAudio index from `inputs.audio.device_id`.
 
 ## Import Existing Spectrum XML
 

@@ -6,13 +6,12 @@ evidence. Green tests alone do not imply full Spectrum parity.
 
 ## Current Verdict
 
-`dome-rs` is not yet a full Spectrum replacement if exact visualizer frame
-equivalence and physical hardware sign-off are required. For the first
-no-hardware version, visualizer frame equivalence and physical LED access are
-explicitly out of scope. The remaining operator/runtime surface is now covered by
-no-hardware gates for input behavior, config editing, MIDI bindings/logs,
-orientation state, Madmom fake-sidecar ingestion, and dome/bar/stage simulator
-streams.
+`dome-rs` is expected to close all parity that can be proven without physical
+hardware or executing the old Spectrum app. The only accepted deferrals are
+physical hardware acceptance and evidence that requires running Spectrum on
+Windows. The no-hardware operator/runtime surface is covered by gates for input
+behavior, config editing, MIDI state/bindings/logs, orientation state, Madmom
+fake-sidecar ingestion, tempo surfaces, and dome/bar/stage simulator streams.
 
 ## Closure Matrix
 
@@ -22,12 +21,12 @@ streams.
 | Visualizer frame parity | Source hashes exist, but expected frame hashes are pending C# execution. | Every visualizer case has a non-null Spectrum frame hash and a Rust golden comparison. |
 | Dome visualizer algorithms | Several modes are deterministic approximations. | Volume, Radial, Race, Snakes, Splat, Quaternion, Paintbrush, TV Static, and Flash match Spectrum frame goldens or documented deviations. |
 | Diagnostics | Dome/bar/stage diagnostics are wired. | C# frame goldens plus physical dome/bar/stage diagnostic sign-off. |
-| Audio input | UDP volume bridge is the no-hardware replacement for native device capture in this first version. | Native audio device selection remains hardware/OS integration work; no-hardware parity uses the documented UDP adapter. |
-| MIDI input | UDP command transport feeds configurable bindings, runtime actions, and a MIDI log. | Hardware device discovery is out of scope for the first no-hardware version; binding behavior is covered by tests. |
+| Audio input | UDP volume bridge, Spectrum audio device identity, all-endpoint index mapping, XML import, and Madmom audio-index derivation are covered. | Windows native capture can be added when OS access is needed; device semantics are represented and tested. |
+| MIDI input | UDP command transport feeds device-scoped state, configurable wildcard/exact bindings, runtime actions, knob/note defaults, Spectrum knob math, and a MIDI log. | Physical controller discovery is hardware acceptance; no-hardware MIDI behavior must remain tested. |
 | Orientation input | Datagram parsing, device map, quaternion state, calibration, action flags, poi speed, and stale-device removal are implemented. | Visualizer-specific orientation frame equivalence remains tied to visualizer parity. |
-| Madmom | Launch args support wrapper and Python-style tracker invocation; runtime uses async child ingestion and fake-sidecar tests. | Bundled Windows package discovery remains deployment work; sidecar protocol/lifecycle is covered without hardware. |
-| Beat timing | Tap tempo and Madmom median/backwards reset are covered. | Add fixtures for long gap, backwards, double-report, missed-beat, and progress phase behavior. |
-| Operator UI | Browser shell has core controls, full config editor, full palette editor, input status, MIDI log, orientation calibration, debug visuals, and preview. | Browser automation/screenshots remain follow-up evidence. |
+| Madmom | Launch args support wrapper and Python-style tracker invocation; runtime uses async child ingestion, derived audio input indexes, and fake-sidecar tests. | Old bundled Windows discovery can only be proven when running Spectrum/Windows packaging. |
+| Beat timing | Tap tempo, BPM string, tap counter, reset, Madmom median/backwards reset, and Spectrum truncating progress math are covered. | Any further mismatch must be backed by old Spectrum execution evidence. |
+| Operator UI | Browser shell has structured input/tempo/Madmom config controls, full config editor, full palette editor, input status, MIDI log, orientation calibration, debug visuals, and preview. | Browser automation/screenshots are evidence work, not feature parity deferral. |
 | Simulators | Dome canvas plus bar/stage command previews are exposed on the live preview and sandbox page. | Exact visual artwork remains visualizer/UI polish, not first-version parity. |
 | Hardware output | OPC mapping/write/reconnect loopback tests pass. | Physical dome, bar, stage, inputs, and reconnect sign-off are intentionally deferred. |
 

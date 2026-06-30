@@ -10,6 +10,15 @@ const barTestPattern = document.querySelector('#bar-test-pattern');
 const stageTestPattern = document.querySelector('#stage-test-pattern');
 const configEditor = document.querySelector('#config-editor');
 const configStatus = document.querySelector('#config-status');
+const configAudioBind = document.querySelector('#config-audio-bind');
+const configAudioDeviceId = document.querySelector('#config-audio-device-id');
+const configMidiBind = document.querySelector('#config-midi-bind');
+const configOrientationBind = document.querySelector('#config-orientation-bind');
+const configTempoSource = document.querySelector('#config-tempo-source');
+const configMadmomCommand = document.querySelector('#config-madmom-command');
+const configMadmomTracker = document.querySelector('#config-madmom-tracker');
+const configMadmomAudioIndex = document.querySelector('#config-madmom-audio-index');
+const configMidiBindings = document.querySelector('#config-midi-bindings');
 const simVolume = document.querySelector('#sim-volume');
 const simVolumeValue = document.querySelector('#sim-volume-value');
 const simBeatProgress = document.querySelector('#sim-beat-progress');
@@ -24,6 +33,8 @@ const inputOrientation = document.querySelector('#input-orientation');
 const inputMadmom = document.querySelector('#input-madmom');
 const orientationDevices = document.querySelector('#orientation-devices');
 const midiLog = document.querySelector('#midi-log');
+const tempoBpm = document.querySelector('#tempo-bpm');
+const tapCounter = document.querySelector('#tap-counter');
 const sandboxActiveVisualizer = document.querySelector('#sandbox-dome-active-vis');
 const sandboxVolume = document.querySelector('#sandbox-volume');
 const sandboxVolumeValue = document.querySelector('#sandbox-volume-value');
@@ -78,9 +89,84 @@ async function loadFullConfig() {
   }
   const config = await request('/api/config');
   configEditor.value = JSON.stringify(config, null, 2);
+  updateStructuredConfigFields(config);
   if (configStatus) {
     configStatus.textContent = 'loaded';
   }
+}
+
+function updateStructuredConfigFields(config) {
+  if (configAudioBind) {
+    configAudioBind.value = config.inputs?.audio?.bind ?? '';
+  }
+  if (configAudioDeviceId) {
+    configAudioDeviceId.value = config.inputs?.audio?.device_id ?? '';
+  }
+  if (configMidiBind) {
+    configMidiBind.value = config.inputs?.midi?.bind ?? '';
+  }
+  if (configOrientationBind) {
+    configOrientationBind.value = config.inputs?.orientation?.bind ?? '';
+  }
+  if (configTempoSource) {
+    configTempoSource.value = config.tempo?.source ?? 'human';
+  }
+  if (configMadmomCommand) {
+    configMadmomCommand.value = config.madmom?.command ?? '';
+  }
+  if (configMadmomTracker) {
+    configMadmomTracker.value = config.madmom?.tracker ?? '';
+  }
+  if (configMadmomAudioIndex) {
+    configMadmomAudioIndex.value = config.madmom?.audio_input_index ?? '';
+  }
+  if (configMidiBindings) {
+    const bindings = config.inputs?.midi?.bindings ?? [];
+    configMidiBindings.textContent = bindings.length
+      ? bindings.map(binding => `${binding.command_kind}:${binding.index}->${binding.action}`).join(', ')
+      : 'none';
+  }
+}
+
+function readConfigEditor() {
+  if (!configEditor) {
+    return undefined;
+  }
+  return JSON.parse(configEditor.value);
+}
+
+function writeOptionalString(target, key, value) {
+  const trimmed = value.trim();
+  if (trimmed) {
+    target[key] = trimmed;
+  } else {
+    delete target[key];
+  }
+}
+
+function updateConfigFromStructuredFields() {
+  const config = readConfigEditor();
+  config.inputs ??= {};
+  config.inputs.audio ??= {};
+  config.inputs.midi ??= {};
+  config.inputs.orientation ??= {};
+  config.tempo ??= {};
+  config.madmom ??= {};
+  writeOptionalString(config.inputs.audio, 'bind', configAudioBind?.value ?? '');
+  writeOptionalString(config.inputs.audio, 'device_id', configAudioDeviceId?.value ?? '');
+  writeOptionalString(config.inputs.midi, 'bind', configMidiBind?.value ?? '');
+  writeOptionalString(config.inputs.orientation, 'bind', configOrientationBind?.value ?? '');
+  config.tempo.source = configTempoSource?.value ?? 'human';
+  config.madmom.command = configMadmomCommand?.value?.trim() || 'DBNBeatTracker';
+  writeOptionalString(config.madmom, 'tracker', configMadmomTracker?.value ?? '');
+  const audioIndex = configMadmomAudioIndex?.value?.trim() ?? '';
+  if (audioIndex) {
+    config.madmom.audio_input_index = Number(audioIndex);
+  } else {
+    delete config.madmom.audio_input_index;
+  }
+  configEditor.value = JSON.stringify(config, null, 2);
+  updateStructuredConfigFields(config);
 }
 
 async function applyFullConfig() {
@@ -188,6 +274,13 @@ function updateInputStatus(inputs) {
   updateInputAdapterStatus(inputMadmom, inputs.madmom_adapter, `${inputs.madmom_beats ?? 0} beats`);
   updateOrientationDevices(inputs.orientation_devices ?? []);
   updateMidiLog(inputs.midi_log ?? []);
+  if (tempoBpm) {
+    tempoBpm.textContent = inputs.bpm ?? '[none]';
+  }
+  if (tapCounter) {
+    tapCounter.textContent = inputs.tap_counter_text ?? 'Tap';
+    tapCounter.dataset.active = String(Boolean(inputs.tap_counter_active));
+  }
 }
 
 function updateInputAdapterStatus(element, adapter, detail) {
@@ -700,8 +793,25 @@ document.querySelector('#apply-config')?.addEventListener('click', async () => {
   await refreshPreviewFrame();
 });
 
+document.querySelector('#apply-structured-config')?.addEventListener('click', async () => {
+  try {
+    updateConfigFromStructuredFields();
+    await applyFullConfig();
+    await refreshPreviewFrame();
+  } catch (error) {
+    if (configStatus) {
+      configStatus.textContent = `structured config failed: ${error.message}`;
+    }
+  }
+});
+
 document.querySelector('#tap-tempo')?.addEventListener('click', async () => {
   updateSnapshot(await request('/api/input/tap', { method: 'POST' }));
+  await refreshPreviewFrame();
+});
+
+document.querySelector('#reset-tempo')?.addEventListener('click', async () => {
+  updateSnapshot(await request('/api/input/tempo/reset', { method: 'POST' }));
   await refreshPreviewFrame();
 });
 

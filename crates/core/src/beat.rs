@@ -26,7 +26,7 @@ impl BeatClock {
         if self.beat_ms == 0 || factor == 0.0 {
             return 0.0;
         }
-        let period = (self.beat_ms as f64 / factor).round().max(1.0) as u64;
+        let period = (self.beat_ms as f64 / factor).max(1.0) as u64;
         ((now_ms.saturating_sub(self.anchor_ms) % period) as f64) / period as f64
     }
 }
@@ -68,6 +68,13 @@ impl BeatBroadcaster {
         }
     }
 
+    /// Reset beat/tap/Madmom state.
+    pub fn reset(&mut self) {
+        self.taps.clear();
+        self.madmom_beats.clear();
+        self.clock = None;
+    }
+
     /// Report a Madmom beat timestamp in audio-stream milliseconds.
     pub fn report_madmom_beat(&mut self, beat_ms: u64, realtime_anchor_ms: u64) {
         if let Some(last) = self.madmom_beats.last() {
@@ -104,6 +111,37 @@ impl BeatBroadcaster {
         self.clock.as_ref().map(|clock| clock.beat_ms)
     }
 
+    /// Spectrum-style BPM display string.
+    #[must_use]
+    pub fn bpm_string(&self) -> String {
+        self.beat_ms().map_or_else(
+            || "[none]".to_string(),
+            |beat_ms| (60_000 / beat_ms).to_string(),
+        )
+    }
+
+    /// Spectrum-style tap counter text.
+    #[must_use]
+    pub fn tap_counter_text(&self, now_ms: u64) -> String {
+        if self.tap_tempo_concluded(now_ms) {
+            "Tap".to_string()
+        } else {
+            self.taps.len().to_string()
+        }
+    }
+
+    /// Whether the tap tempo counter should display as active.
+    #[must_use]
+    pub fn tap_counter_active(&self, now_ms: u64) -> bool {
+        !self.tap_tempo_concluded(now_ms)
+    }
+
+    fn tap_tempo_concluded(&self, now_ms: u64) -> bool {
+        self.taps.last().map_or(true, |last| {
+            now_ms.saturating_sub(*last) > Self::TAP_TIMEOUT_MS
+        })
+    }
+
     /// Progress through a beat-like factor.
     #[must_use]
     pub fn progress(&self, now_ms: u64, factor: f64) -> f64 {
@@ -136,6 +174,14 @@ mod tests {
     }
 
     #[test]
+    fn progress_truncates_fractional_period_like_spectrum() {
+        let clock = BeatClock::new(1_000, 0);
+
+        assert_close(clock.progress(333, 3.0), 0.0);
+        assert_close(clock.progress(334, 3.0), 1.0 / 333.0);
+    }
+
+    #[test]
     fn tap_tempo_sets_average_beat_length() {
         let mut beat = BeatBroadcaster::default();
         beat.add_tap(1_000);
@@ -143,7 +189,26 @@ mod tests {
         beat.add_tap(2_000);
 
         assert_eq!(beat.beat_ms(), Some(500));
+        assert_eq!(beat.bpm_string(), "120");
+        assert_eq!(beat.tap_counter_text(2_100), "3");
+        assert!(beat.tap_counter_active(2_100));
+        assert_eq!(beat.tap_counter_text(4_100), "Tap");
         assert!(beat.currently_flashed_off(2_250, 1.0));
+    }
+
+    #[test]
+    fn reset_clears_tempo_state() {
+        let mut beat = BeatBroadcaster::default();
+        beat.add_tap(1_000);
+        beat.add_tap(1_500);
+        beat.add_tap(2_000);
+        assert_eq!(beat.bpm_string(), "120");
+
+        beat.reset();
+
+        assert_eq!(beat.beat_ms(), None);
+        assert_eq!(beat.bpm_string(), "[none]");
+        assert_close(beat.progress(2_500, 1.0), 0.0);
     }
 
     #[test]

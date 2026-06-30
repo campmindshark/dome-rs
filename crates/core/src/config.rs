@@ -115,9 +115,9 @@ pub struct TempoConfig {
 /// Live input adapter config.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct InputConfig {
-    /// Optional UDP audio volume source.
+    /// Audio input source and selected device config.
     #[serde(default)]
-    pub audio: UdpInputConfig,
+    pub audio: AudioInputConfig,
     /// MIDI command source and binding config.
     #[serde(default)]
     pub midi: MidiInputConfig,
@@ -131,6 +131,40 @@ pub struct InputConfig {
 pub struct UdpInputConfig {
     /// Bind address. When unset, this input adapter is disabled.
     pub bind: Option<String>,
+}
+
+/// Audio input config.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct AudioInputConfig {
+    /// Optional UDP volume bind. When unset, the UDP bridge is disabled.
+    pub bind: Option<String>,
+    /// Stable Spectrum audio endpoint id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<String>,
+    /// Optional fakeable all-endpoint list used for no-hardware parity tests.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub devices: Vec<AudioDeviceConfig>,
+}
+
+/// Configured audio endpoint.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct AudioDeviceConfig {
+    /// Stable endpoint id.
+    pub id: String,
+    /// Friendly display name.
+    pub name: String,
+    /// Endpoint flow.
+    pub flow: AudioDeviceFlowConfig,
+}
+
+/// Configured endpoint flow.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioDeviceFlowConfig {
+    /// Capture/recording endpoint.
+    Capture,
+    /// Render/playback endpoint.
+    Render,
 }
 
 /// MIDI input binding config.
@@ -174,6 +208,9 @@ pub enum MidiBindingAction {
 /// One MIDI command binding.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct MidiBindingConfig {
+    /// Optional MIDI device index. When unset, the binding applies to every device.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_index: Option<u8>,
     /// MIDI command kind.
     pub command_kind: MidiBindingCommandKind,
     /// Note/controller/program index.
@@ -191,12 +228,14 @@ impl Default for MidiInputConfig {
             bind: None,
             bindings: vec![
                 MidiBindingConfig {
+                    device_index: None,
                     command_kind: MidiBindingCommandKind::Note,
                     index: 64,
                     action: MidiBindingAction::Flash,
                     target_index: None,
                 },
                 MidiBindingConfig {
+                    device_index: None,
                     command_kind: MidiBindingCommandKind::ControlChange,
                     index: 1,
                     action: MidiBindingAction::Volume,
@@ -510,6 +549,7 @@ pub fn import_spectrum_xml(xml: &str) -> ImportedConfig {
         _ => TempoSource::Human,
     };
     config.tempo.flash_speed = f64_tag(xml, "flashSpeed").unwrap_or(config.tempo.flash_speed);
+    config.inputs.audio.device_id = tag_value(xml, "audioDeviceID").map(str::to_string);
     config.color_palette = color_palette(xml);
     config.color_palette_index =
         u8_tag(xml, "colorPaletteIndex").unwrap_or(config.color_palette_index);
@@ -621,6 +661,10 @@ mod tests {
         assert_eq!(imported.config.bar.infinity_length, 50);
         assert_eq!(imported.config.stage.side_lengths.len(), 48);
         assert_eq!(imported.config.tempo.source, TempoSource::Human);
+        assert_eq!(
+            imported.config.inputs.audio.device_id.as_deref(),
+            Some("{0.0.1.00000000}.{1ce71263-2eb5-4744-94e7-5bc353f90945}")
+        );
         assert_eq!(imported.config.color_palette_index, 7);
         assert_eq!(imported.config.color_palette.colors.len(), 64);
         assert_eq!(
