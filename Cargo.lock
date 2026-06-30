@@ -168,6 +168,7 @@ dependencies = [
  "axum",
  "domers-core",
  "domers-engine",
+ "domers-inputs",
  "domers-outputs",
  "domers-visualizers",
  "serde",

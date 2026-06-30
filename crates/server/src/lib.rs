@@ -12,8 +12,9 @@ use axum::{
     routing::{get, patch, post},
     Json, Router,
 };
-use domers_core::{ColorPalette, DomersConfig, EngineConfig, PaletteEntry, Rgb};
+use domers_core::{BeatBroadcaster, ColorPalette, DomersConfig, EngineConfig, PaletteEntry, Rgb};
 use domers_engine::{schedule_operator_frame, FullVisualizerSpec, InputSpec, OutputSpec};
+use domers_inputs::{classify_datagram, parse_beat_line, MidiCommand, MidiCommandKind};
 use domers_outputs::{
     apply_bar_commands, apply_dome_commands, apply_stage_commands, BarCommand, DomeCommand,
     OpcAddress, OpcClient, PersistentChannel, StageCommand,
@@ -67,6 +68,27 @@ pub struct ServerSnapshot {
     pub simulator: SimulatorControls,
     /// Hardware output connection status.
     pub hardware: HardwareStatus,
+    /// Live input status and latest runtime values.
+    pub inputs: InputStatus,
+}
+
+/// Live input status exposed through `/api/state`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+pub struct InputStatus {
+    /// Last live audio volume, if any.
+    pub volume: Option<f32>,
+    /// Current beat length in milliseconds, if known.
+    pub beat_ms: Option<u64>,
+    /// Current beat progress in `[0.0, 1.0)`.
+    pub beat_progress: f64,
+    /// Number of tap-tempo taps accepted.
+    pub taps: u64,
+    /// Number of parsed Madmom beat lines accepted.
+    pub madmom_beats: u64,
+    /// Number of MIDI commands applied.
+    pub midi_commands: u64,
+    /// Last recognized orientation datagram kind.
+    pub last_orientation: Option<String>,
 }
 
 /// Hardware output status exposed through `/api/state`.
@@ -184,6 +206,7 @@ impl SimulatorControls {
 pub struct ServerState {
     config: DomersConfig,
     simulator: SimulatorControls,
+    inputs: InputRuntime,
     metrics: Metrics,
     running: bool,
 }
@@ -199,6 +222,7 @@ impl ServerState {
                 beat_progress: 0.25,
                 flash_active: true,
             },
+            inputs: InputRuntime::default(),
             metrics: Metrics {
                 frames: 0,
                 simulator_frames: 0,
@@ -292,6 +316,57 @@ impl ServerState {
         self.metrics.frames = self.metrics.frames.saturating_add(1);
     }
 
+    /// Apply one live audio volume sample.
+    pub fn apply_audio_volume(&mut self, volume: f32) {
+        self.inputs.volume = Some(volume.clamp(0.0, 1.0));
+    }
+
+    /// Record a human tap-tempo event at the current runtime timestamp.
+    pub fn tap_tempo(&mut self) {
+        self.inputs.taps = self.inputs.taps.saturating_add(1);
+        self.inputs.beat.add_tap(self.now_ms());
+    }
+
+    /// Parse and record a Madmom `BEAT:` stdout line.
+    pub fn report_madmom_line(&mut self, line: &str) -> bool {
+        if let Some(beat_ms) = parse_beat_line(line) {
+            self.inputs.madmom_beats = self.inputs.madmom_beats.saturating_add(1);
+            self.inputs.beat.report_madmom_beat(beat_ms, self.now_ms());
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Apply MIDI commands to runtime state.
+    pub fn apply_midi_commands(&mut self, commands: &[MidiCommand]) {
+        self.inputs.midi_commands = self
+            .inputs
+            .midi_commands
+            .saturating_add(commands.len() as u64);
+        for command in commands {
+            match command.kind {
+                MidiCommandKind::Note if command.index == 64 => {
+                    self.simulator.flash_active = command.value > 0.0;
+                }
+                MidiCommandKind::ControlChange if command.index == 1 => {
+                    self.simulator.volume = command.value.clamp(0.0, 1.0);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Classify and record one orientation datagram.
+    pub fn apply_orientation_datagram(&mut self, bytes: &[u8]) -> bool {
+        if let Some(kind) = classify_datagram(bytes) {
+            self.inputs.last_orientation = Some(format!("{kind:?}"));
+            true
+        } else {
+            false
+        }
+    }
+
     /// Produce one deterministic simulator frame for the selected visualizer.
     pub fn simulator_frame(&mut self) -> Vec<DomeCommand> {
         self.metrics.frames = self.metrics.frames.saturating_add(1);
@@ -306,7 +381,7 @@ impl ServerState {
     /// Produce one scheduled operator frame for all outputs.
     #[must_use]
     pub fn operator_frame(&self) -> OperatorCommandFrame {
-        render_operator_frame(&self.config, self.simulator)
+        render_operator_frame(&self.config, self.visualizer_controls())
     }
 
     /// Return a serializable snapshot.
@@ -318,8 +393,46 @@ impl ServerState {
             metrics: self.metrics,
             simulator: self.simulator,
             hardware: HardwareStatus::default(),
+            inputs: self.input_status(),
         }
     }
+
+    fn now_ms(&self) -> u64 {
+        self.metrics.frames.saturating_mul(2_500) / 1_000
+    }
+
+    fn visualizer_controls(&self) -> SimulatorControls {
+        let mut controls = self.simulator;
+        if let Some(volume) = self.inputs.volume {
+            controls.volume = volume;
+        }
+        if self.inputs.beat.beat_ms().is_some() {
+            controls.beat_progress = self.inputs.beat.progress(self.now_ms(), 1.0);
+        }
+        controls
+    }
+
+    fn input_status(&self) -> InputStatus {
+        InputStatus {
+            volume: self.inputs.volume,
+            beat_ms: self.inputs.beat.beat_ms(),
+            beat_progress: self.inputs.beat.progress(self.now_ms(), 1.0),
+            taps: self.inputs.taps,
+            madmom_beats: self.inputs.madmom_beats,
+            midi_commands: self.inputs.midi_commands,
+            last_orientation: self.inputs.last_orientation.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct InputRuntime {
+    volume: Option<f32>,
+    beat: BeatBroadcaster,
+    taps: u64,
+    madmom_beats: u64,
+    midi_commands: u64,
+    last_orientation: Option<String>,
 }
 
 /// Shared runnable app runtime.
@@ -362,6 +475,7 @@ impl AppRuntime {
             .route("/api/stop", post(stop_engine))
             .route("/api/config/dome", patch(patch_dome_config))
             .route("/api/config/palette", patch(patch_palette_entry))
+            .route("/api/input/tap", post(tap_tempo))
             .route("/api/dome/geometry", get(dome_geometry))
             .route("/api/dome/mapping", get(dome_mapping))
             .route("/api/simulator", patch(patch_simulator_controls))
@@ -429,6 +543,13 @@ impl AppRuntime {
     /// Patch simulator input controls.
     pub async fn patch_simulator_controls(&self, patch: SimulatorControlsPatch) {
         self.state.lock().await.patch_simulator_controls(patch);
+    }
+
+    /// Record a tap-tempo input.
+    pub async fn tap_tempo(&self) -> ServerSnapshot {
+        let mut state = self.state.lock().await;
+        state.tap_tempo();
+        state.snapshot()
     }
 
     /// Produce one simulator frame immediately.
@@ -814,6 +935,11 @@ async fn patch_palette_entry(
     Json(runtime.snapshot().await)
 }
 
+async fn tap_tempo(State(runtime): State<AppRuntime>) -> Json<ServerSnapshot> {
+    runtime.tap_tempo().await;
+    Json(runtime.snapshot().await)
+}
+
 async fn patch_simulator_controls(
     State(runtime): State<AppRuntime>,
     Json(patch): Json<SimulatorControlsPatch>,
@@ -1176,6 +1302,7 @@ mod tests {
     };
 
     use domers_core::{DomersConfig, PaletteEntry};
+    use domers_inputs::{MidiCommand, MidiCommandKind};
     use domers_outputs::DomeCommand;
     use tokio::time;
     use tokio::{io::AsyncReadExt, net::TcpListener};
@@ -1270,6 +1397,47 @@ mod tests {
         assert!((snapshot.simulator.volume - 0.25).abs() < f32::EPSILON);
         assert!((snapshot.simulator.beat_progress - 0.75).abs() < f64::EPSILON);
         assert!(!snapshot.simulator.flash_active);
+    }
+
+    #[test]
+    fn runtime_inputs_update_status_and_visualizer_controls() {
+        let mut state = ServerState::default();
+        state.apply_audio_volume(0.33);
+        state.apply_midi_commands(&[
+            MidiCommand {
+                kind: MidiCommandKind::Note,
+                index: 64,
+                value: 0.0,
+            },
+            MidiCommand {
+                kind: MidiCommandKind::ControlChange,
+                index: 1,
+                value: 0.5,
+            },
+        ]);
+        assert!(state.apply_orientation_datagram(&[1; 15]));
+        state.tap_tempo();
+        for _ in 0..200 {
+            state.engine_frame();
+        }
+        state.tap_tempo();
+        for _ in 0..200 {
+            state.engine_frame();
+        }
+        state.tap_tempo();
+        assert!(state.report_madmom_line("BEAT:10.000"));
+        assert!(state.report_madmom_line("BEAT:10.400"));
+
+        let snapshot = state.snapshot();
+
+        assert_eq!(snapshot.inputs.volume, Some(0.33));
+        assert_eq!(snapshot.inputs.beat_ms, Some(400));
+        assert_eq!(snapshot.inputs.taps, 3);
+        assert_eq!(snapshot.inputs.madmom_beats, 2);
+        assert_eq!(snapshot.inputs.midi_commands, 2);
+        assert_eq!(snapshot.inputs.last_orientation.as_deref(), Some("WandV1"));
+        assert!(!snapshot.simulator.flash_active);
+        assert!((snapshot.simulator.volume - 0.5).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -1479,6 +1647,13 @@ mod tests {
         )
         .await;
         assert!(started.contains("\"running\":true"));
+
+        let tapped = http_request(
+            addr,
+            "POST /api/input/tap HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+        assert!(tapped.contains("\"taps\":1"));
 
         let geometry = http_request(
             addr,

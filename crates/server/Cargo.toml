@@ -10,6 +10,7 @@ rust-version.workspace = true
 axum = { version = "0.8.9", features = ["ws"] }
 domers-core = { path = "../core" }
 domers-engine = { path = "../engine" }
+domers-inputs = { path = "../inputs" }
 domers-outputs = { path = "../outputs" }
 domers-visualizers = { path = "../visualizers" }
 serde = { version = "1.0.228", features = ["derive"] }
