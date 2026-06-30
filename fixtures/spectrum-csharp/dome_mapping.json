@@ -1,0 +1,835 @@
+{
+  "bar_control_box": 5,
+  "control_box_strut_order": [
+    [
+      "Green",
+      "Blue",
+      "Orange",
+      "Orange",
+      "Yellow"
+    ],
+    [
+      "Orange",
+      "Blue",
+      "Purple",
+      "Blue",
+      "Red"
+    ],
+    [
+      "Red",
+      "Blue",
+      "Green",
+      "Green",
+      "Blue"
+    ],
+    [
+      "Green",
+      "Blue",
+      "Red",
+      "Yellow",
+      "Yellow"
+    ],
+    [
+      "Green",
+      "Purple",
+      "Blue",
+      "Red"
+    ],
+    [
+      "Green",
+      "Purple",
+      "Purple",
+      "Green",
+      "Green"
+    ],
+    [
+      "Orange",
+      "Yellow",
+      "Yellow",
+      "Red",
+      "Red"
+    ],
+    [
+      "Blue",
+      "Blue",
+      "Blue",
+      "Yellow"
+    ]
+  ],
+  "known_unverified": [
+    "Physical strut direction and control-box cabling still require hardware sign-off."
+  ],
+  "max_strip_length": 214,
+  "source": "spectrum/LEDs/LEDDomeOutput.cs",
+  "strut_count": 190,
+  "strut_lengths": {
+    "Blue": 40,
+    "Green": 42,
+    "Orange": 40,
+    "Purple": 44,
+    "Red": 40,
+    "Yellow": 34
+  },
+  "strut_positions": [
+    {
+      "control_box": 0,
+      "control_box_strut_index": 22
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 23
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 36
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 21
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 22
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 23
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 36
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 21
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 22
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 23
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 36
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 21
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 22
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 23
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 36
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 21
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 22
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 23
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 36
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 21
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 5
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 19
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 30
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 29
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 5
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 19
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 30
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 29
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 5
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 19
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 30
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 29
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 5
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 19
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 30
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 29
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 5
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 19
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 30
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 29
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 11
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 1
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 25
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 11
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 1
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 25
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 11
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 1
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 25
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 11
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 1
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 25
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 11
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 1
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 25
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 13
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 27
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 13
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 27
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 13
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 27
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 13
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 27
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 13
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 27
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 9
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 9
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 9
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 9
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 9
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 15
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 16
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 17
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 18
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 37
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 33
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 35
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 20
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 15
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 16
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 17
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 18
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 37
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 33
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 35
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 20
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 15
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 16
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 17
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 18
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 37
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 33
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 35
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 20
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 15
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 16
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 17
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 18
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 37
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 33
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 35
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 20
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 15
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 16
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 17
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 18
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 37
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 33
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 35
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 20
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 24
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 6
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 10
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 31
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 32
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 34
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 0
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 24
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 6
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 10
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 31
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 32
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 34
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 0
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 24
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 6
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 10
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 31
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 32
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 34
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 0
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 24
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 6
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 10
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 31
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 32
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 34
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 0
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 24
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 6
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 10
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 31
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 32
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 34
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 0
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 7
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 12
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 2
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 28
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 26
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 7
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 12
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 2
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 28
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 26
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 7
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 12
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 2
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 28
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 26
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 7
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 12
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 2
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 28
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 26
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 7
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 12
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 2
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 28
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 26
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 14
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 3
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 8
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 14
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 3
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 8
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 14
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 3
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 8
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 14
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 3
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 8
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 14
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 3
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 8
+    },
+    {
+      "control_box": 1,
+      "control_box_strut_index": 4
+    },
+    {
+      "control_box": 2,
+      "control_box_strut_index": 4
+    },
+    {
+      "control_box": 3,
+      "control_box_strut_index": 4
+    },
+    {
+      "control_box": 4,
+      "control_box_strut_index": 4
+    },
+    {
+      "control_box": 0,
+      "control_box_strut_index": 4
+    }
+  ]
+}

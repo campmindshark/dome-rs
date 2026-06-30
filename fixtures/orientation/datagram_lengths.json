@@ -1,0 +1,21 @@
+{
+  "source": "spectrum/Spectrum/DatagramHandler.cs",
+  "types": {
+    "1": {
+      "length": 15,
+      "name": "wand_v1"
+    },
+    "2": {
+      "length": 17,
+      "name": "poi"
+    },
+    "3": {
+      "length": 15,
+      "name": "wand_v2"
+    },
+    "4": {
+      "length": 15,
+      "name": "wristband"
+    }
+  }
+}

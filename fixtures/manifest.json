@@ -1,0 +1,8 @@
+{
+  "capture_tool": "tools/extract_spectrum_fixtures.py",
+  "known_unverified": [
+    "Hardware wiring must still be checked with diagnostic patterns.",
+    "Visualizer frame hashes will be added when visualizer ports begin."
+  ],
+  "source_repo": "spectrum"
+}

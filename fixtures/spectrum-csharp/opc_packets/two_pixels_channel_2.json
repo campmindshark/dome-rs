@@ -1,0 +1,10 @@
+{
+  "channel": 2,
+  "description": "Non-standard Spectrum OPC header without 0xff prefix.",
+  "hex": "02000006123456aabbcc",
+  "pixels": [
+    "0x123456",
+    "0xaabbcc"
+  ],
+  "source": "spectrum/LEDs/OPCAPI.cs"
+}
