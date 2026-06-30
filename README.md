@@ -4,17 +4,26 @@ Rust rewrite of Camp Mindshark Spectrum lighting control.
 
 ## Current Status
 
-Initial scaffold only. The first implementation increments establish:
+Domers now runs as a no-hardware operator app:
 
-- documented porting inventory
-- C# fixture capture layout
-- Rust workspace and CI gates
-- scheduler, OPC, input, simulator, and migration test seams
+- TOML config loading from `examples/domers.toml` or an imported config
+- HTTP API for health, state, start, stop, and dome visualizer config
+- WebSocket simulator frame stream
+- browser operator shell served by the Rust binary
+- tested scheduler, OPC, input, simulator, visualizer, migration, and server seams
+
+Run locally:
+
+```sh
+cargo run --bin domers -- --config examples/domers.toml --bind 127.0.0.1:3000
+```
+
+Then open `http://127.0.0.1:3000`.
 
 ## Development
 
 ```sh
-cargo fmt --check
+cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 node ui/check.mjs
@@ -68,12 +77,12 @@ The old Windows app searched for a bundled Python 3.7 virtualenv at `Madmom/env/
 
 ## UI Reference
 
-The first browser shell exposes engine start/stop, dome visualizer selection, flash speed, and a dome simulator canvas. See [`docs/ui-expectations.md`](docs/ui-expectations.md) for expected UI states and image placeholders.
+The browser shell exposes engine start/stop, dome visualizer selection, flash speed, metrics, and a WebSocket-backed dome simulator canvas. See [`docs/ui-expectations.md`](docs/ui-expectations.md) for expected UI states and image placeholders.
 
 TODO: Add image of the initial Domers operator page here.
 
 - Capture: full browser window at desktop size.
-- Expected: title, start/stop buttons, dome visualizer selector, flash speed slider, and black simulator canvas are visible.
+- Expected: title, start/stop buttons, dome visualizer selector, flash speed slider, metrics, stream status, and simulator canvas are visible.
 - Suggested file: `docs/images/readme-operator-shell.png`.
 
 Local Docker/Rust may not be installed on every workstation; GitHub Actions is the merge-blocking source of truth.

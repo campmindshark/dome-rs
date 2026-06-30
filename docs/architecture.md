@@ -25,14 +25,18 @@ The browser simulator is driven by engine frame data. It does not read back from
 
 ## Current Implementation Status
 
-The current server crate implements an in-process `ServerState` contract for health, start/stop, config patching, metrics, and deterministic simulator frames. The browser shell is static and smoke-tested.
+The server crate implements both the in-process `ServerState` contract and the runnable HTTP/WebSocket adapter. The `domers` binary loads TOML config, serves the browser shell, exposes JSON API endpoints, and streams simulator frames over WebSocket.
 
-Still needed for a usable operator app:
+Current network surface:
 
-- an HTTP API adapter around `ServerState`
-- a WebSocket stream for simulator frames and metrics
-- browser wiring from the UI controls to those API/WebSocket endpoints
-- the long-running engine loop that applies the timing contracts below
+- `GET /`: browser operator shell
+- `GET /main.mjs`: browser control script
+- `GET /api/health`: health JSON
+- `GET /api/state`: running state, engine config, and metrics
+- `POST /api/start`: start the engine loop
+- `POST /api/stop`: stop the engine loop
+- `PATCH /api/config/dome`: patch dome visualizer config
+- `GET /ws/simulator`: simulator frame and metrics stream
 
 ## Timing Contracts
 
@@ -77,8 +81,8 @@ TODO: Add architecture diagram image.
 - Expected: clearly shows simulator frames are separate from OPC hardware output.
 - Suggested file: `docs/images/architecture-runtime-flow.png`.
 
-TODO: Add screenshot of server metrics once the HTTP/WebSocket adapter exists.
+TODO: Add screenshot of server metrics.
 
-- Capture: browser/devtool/API output showing frame counters and simulator frame counters after the network adapter is wired.
+- Capture: browser/devtool/API output showing frame counters and simulator frame counters.
 - Expected: `frames` and `simulator_frames` are visible.
 - Suggested file: `docs/images/architecture-server-metrics.png`.

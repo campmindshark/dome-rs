@@ -20,7 +20,8 @@ node ui/check.mjs
 - Fake audio, MIDI, orientation, and Madmom beat inputs.
 - Visualizer simulator-frame harness for initial live dome modes.
 - Server state contract for config patching, start/stop, metrics, and simulator frames.
-- UI smoke markers for the initial browser shell.
+- Real HTTP adapter smoke coverage for UI, state, and start routes.
+- UI smoke markers for API/WebSocket wiring in the browser shell.
 
 Tests for intentional behavior changes should cite
 [`intentional-deviations.md`](intentional-deviations.md) so it is clear whether
@@ -34,9 +35,17 @@ cargo clippy --workspace --all-targets -- -D warnings
 node ui/check.mjs
 ```
 
+Live no-hardware smoke:
+
+```sh
+cargo run --bin domers -- --config examples/domers.toml --bind 127.0.0.1:3000
+```
+
+Then open `http://127.0.0.1:3000`, click `Start`, and confirm the metrics advance.
+
 ## PR Full And Nightly
 
-Later increments add deeper fixture golden tests, real Docker Compose OPC loopback services, fake Madmom sidecar process tests, fake orientation sender services, visualizer frame hash snapshots, server e2e, UI e2e, and load tests.
+Later increments add deeper fixture golden tests, real Docker Compose OPC loopback services, fake Madmom sidecar process tests, fake orientation sender services, visualizer frame hash snapshots, browser automation, and load tests.
 
 ## Manual Hardware Checklist
 

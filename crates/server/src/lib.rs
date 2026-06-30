@@ -301,6 +301,15 @@ impl AppRuntime {
 /// Returns an error if the TCP listener cannot bind or the HTTP server fails.
 pub async fn serve(addr: SocketAddr, config: EngineConfig) -> std::io::Result<()> {
     let listener = TcpListener::bind(addr).await?;
+    serve_listener(listener, config).await
+}
+
+/// Serve Domers from an existing listener.
+///
+/// # Errors
+///
+/// Returns an error if the HTTP server fails.
+pub async fn serve_listener(listener: TcpListener, config: EngineConfig) -> std::io::Result<()> {
     axum::serve(listener, AppRuntime::new(config).router()).await
 }
 
@@ -390,12 +399,18 @@ fn serialize_commands(commands: Vec<DomeCommand>) -> Vec<SimulatorCommand> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{
+        io::{ErrorKind, Read, Write},
+        net::{SocketAddr, TcpStream},
+        time::Duration,
+    };
 
+    use domers_core::EngineConfig;
     use domers_outputs::DomeCommand;
+    use tokio::net::TcpListener;
     use tokio::time;
 
-    use super::{health, AppRuntime, ServerState};
+    use super::{health, serve_listener, AppRuntime, ServerState};
 
     #[test]
     fn health_is_ok() {
@@ -438,6 +453,42 @@ mod tests {
         assert!(!runtime.snapshot().await.running);
     }
 
+    #[tokio::test]
+    async fn http_adapter_serves_ui_state_and_start() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener binds");
+        let addr = listener.local_addr().expect("listener has local address");
+        let server = tokio::spawn(async move {
+            serve_listener(listener, EngineConfig::default())
+                .await
+                .expect("server runs");
+        });
+
+        let html = http_request(
+            addr,
+            "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+        assert!(html.contains("Domers Operator"));
+
+        let state = http_request(
+            addr,
+            "GET /api/state HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+        assert!(state.contains("\"running\":false"));
+
+        let started = http_request(
+            addr,
+            "POST /api/start HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        )
+        .await;
+        assert!(started.contains("\"running\":true"));
+
+        server.abort();
+    }
+
     #[test]
     fn stop_updates_running_state_without_dropping_config() {
         let mut state = ServerState::default();
@@ -447,5 +498,35 @@ mod tests {
 
         assert!(!state.running());
         assert_eq!(state.config().dome_active_vis, 7);
+    }
+
+    async fn http_request(addr: SocketAddr, request: &'static str) -> String {
+        tokio::task::spawn_blocking(move || blocking_http_request(addr, request))
+            .await
+            .expect("blocking request joins")
+    }
+
+    fn blocking_http_request(addr: SocketAddr, request: &str) -> String {
+        let mut stream = TcpStream::connect(addr).expect("connect to test server");
+        stream
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .expect("read timeout is set");
+        stream
+            .write_all(request.as_bytes())
+            .expect("request writes");
+
+        let mut response = Vec::new();
+        let mut buffer = [0_u8; 4096];
+        loop {
+            match stream.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(read) => response.extend_from_slice(&buffer[..read]),
+                Err(error) if error.kind() == ErrorKind::WouldBlock => break,
+                Err(error) if error.kind() == ErrorKind::TimedOut => break,
+                Err(error) => panic!("response reads: {error}"),
+            }
+        }
+
+        String::from_utf8(response).expect("response is utf8")
     }
 }
