@@ -37,6 +37,8 @@ pub const ENGINE_FRAME_INTERVAL: Duration = Duration::from_micros(2_500);
 /// Emit a browser simulator frame roughly every 32.5 ms while the engine runs.
 pub const SIMULATOR_FRAME_STRIDE: u64 = 13;
 
+const DOME_CONTROL_BOX_PIXEL_COUNT: usize = 214 * 8;
+
 /// Health status returned by the early API.
 #[must_use]
 pub const fn health() -> &'static str {
@@ -402,7 +404,13 @@ impl AppRuntime {
 
     /// Stop the engine task.
     pub async fn stop(&self) {
-        self.state.lock().await.stop();
+        let config = {
+            let mut state = self.state.lock().await;
+            let config = state.full_config();
+            state.stop();
+            config
+        };
+        self.hardware.lock().await.blackout(&config).await;
         if let Some(task) = self.engine_task.lock().await.take() {
             task.abort();
         }
@@ -558,6 +566,27 @@ impl HardwareOutputs {
             self.stage.disable();
         }
     }
+
+    async fn blackout(&mut self, config: &DomersConfig) {
+        if config.dome.enabled {
+            self.dome_channel.blackout(dome_pixel_count(config));
+            self.dome
+                .send(
+                    config.dome.opc_address.clone(),
+                    self.dome_channel.current_pixels(),
+                )
+                .await;
+        }
+        if config.stage.enabled {
+            self.stage_channel.blackout(stage_pixel_count(config));
+            self.stage
+                .send(
+                    config.stage.opc_address.clone(),
+                    self.stage_channel.current_pixels(),
+                )
+                .await;
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -613,6 +642,23 @@ impl HardwareTarget {
         self.status.enabled = false;
         self.status.connected = false;
     }
+}
+
+fn dome_pixel_count(config: &DomersConfig) -> usize {
+    let control_boxes = if config.bar.enabled { 6 } else { 5 };
+    control_boxes * DOME_CONTROL_BOX_PIXEL_COUNT
+}
+
+fn stage_pixel_count(config: &DomersConfig) -> usize {
+    config
+        .stage
+        .side_lengths
+        .chunks(3)
+        .map(|triangle| triangle.iter().sum::<u32>() as usize)
+        .max()
+        .unwrap_or(0)
+        * 3
+        * 16
 }
 
 /// Serve Domers on the provided socket address.
@@ -1362,6 +1408,35 @@ mod tests {
         let byte_index = device_index * 3;
         assert_eq!(header[0], 0);
         assert_eq!(&body[byte_index..byte_index + 3], &[0xff, 0, 0]);
+        assert!(hardware.status().dome.connected);
+    }
+
+    #[tokio::test]
+    async fn hardware_outputs_blackout_sends_zero_frame_on_stop() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener binds");
+        let addr = listener.local_addr().expect("listener has local addr");
+        let read = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("accepts");
+            let mut header = [0_u8; 4];
+            stream.read_exact(&mut header).await.expect("reads header");
+            let length = u16::from_be_bytes([header[2], header[3]]) as usize;
+            let mut body = vec![0_u8; length];
+            stream.read_exact(&mut body).await.expect("reads body");
+            (header, body)
+        });
+        let mut config = DomersConfig::default();
+        config.dome.enabled = true;
+        config.dome.opc_address = format!("127.0.0.1:{}", addr.port());
+        let mut hardware = super::HardwareOutputs::default();
+
+        hardware.blackout(&config).await;
+
+        let (header, body) = read.await.expect("read joins");
+        assert_eq!(header[0], 0);
+        assert_eq!(body.len(), super::dome_pixel_count(&config) * 3);
+        assert!(body.iter().all(|channel| *channel == 0));
         assert!(hardware.status().dome.connected);
     }
 

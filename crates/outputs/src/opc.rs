@@ -47,6 +47,18 @@ impl PersistentChannel {
     pub fn current_pixels(&self) -> &[Rgb] {
         &self.current
     }
+
+    /// Force the current and next frame buffers to black with at least `pixel_count` pixels.
+    pub fn blackout(&mut self, pixel_count: usize) {
+        self.current.resize(pixel_count, Rgb::default());
+        self.next.resize(pixel_count, Rgb::default());
+        for pixel in &mut self.current {
+            *pixel = Rgb::default();
+        }
+        for pixel in &mut self.next {
+            *pixel = Rgb::default();
+        }
+    }
 }
 
 /// Parsed OPC address in `host:port[:channel]` form.
