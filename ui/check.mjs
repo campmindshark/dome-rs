@@ -199,7 +199,7 @@ for (const marker of [
   'id="dome-simulator"',
   'id="bar-simulator"',
   'id="stage-simulator"',
-  'aria-label="Simulator-Only Controls"',
+  'aria-label="Simulator Controls"',
   'id="sandbox-dome-active-vis"',
   'id="sandbox-volume"',
   'id="sandbox-beat-progress"',

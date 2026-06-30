@@ -8361,7 +8361,7 @@ function ConfigEditor() {
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Device ID" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Optional native device identifier. Leave blank to use bridge input only." }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Optional native device identifier. Leave blank to use the bridge input." }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-audio-device-id", name: "configAudioDeviceId", type: "text", placeholder: "default input device" })
           ] })
         ] }),
@@ -8708,9 +8708,9 @@ function ControlApp() {
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OpcTargetsFooter, {})
   ] });
 }
-function SimulatorOnlyControls() {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Simulator-Only Controls", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Simulator-Only Controls" }),
+function SimulatorControls() {
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Simulator Controls", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Simulator Controls" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
       "Dome visualizer",
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisualizerSelect, { id: "sandbox-dome-active-vis", name: "sandboxDomeActiveVis" })
@@ -8752,7 +8752,7 @@ function SimulatorApp() {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", { "data-domers-simulator": true, children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", { children: "MindShark Dome Simulator" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: "/", children: "Back to controls" }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SimulatorOnlyControls, {}),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SimulatorControls, {}),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SimulatorFrameView, { streamText: "simulator sandbox" })
   ] });
 }

@@ -53,14 +53,14 @@ Expected behavior when selecting each dome visualizer:
 Expected simulator behavior:
 
 - `/simulator` is a dedicated simulator page
-- `/simulator` has simulator-only controls for visualizer, fake audio/beat inputs, flash overlay, and preview colors
+- `/simulator` has simulator controls for visualizer, fake audio/beat inputs, flash overlay, and preview colors
 - changing `/simulator` controls does not patch live runtime config, shared simulator inputs, or hardware output
 - TV Static is selectable in the dome visualizer controls
-- the live controls page starts simulator work only after opening the `Preview` drawer
+- the live controls page starts simulator work after opening the `Preview` drawer
 - the live `Preview` drawer mirrors the runtime frame stream used for hardware output
 - dome canvas uses runtime frame data from the server, not direct hardware sockets
 - per-pixel visualizers render visible pixels
 - buffer-based visualizers can render with OPC disabled
-- display color compensation is applied only to the UI view, never to OPC bytes
-- preview drawer shows frame metrics, stream status, and `dome-simulator` without simulator-only controls
+- display color compensation is applied to the UI view and never to OPC bytes
+- preview drawer shows frame metrics, stream status, and `dome-simulator` without sandbox controls
 - live preview and `/simulator` expose bar and stage command previews beside the dome canvas

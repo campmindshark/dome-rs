@@ -52,7 +52,7 @@ function ConfigEditor() {
             </label>
             <label className="config-field">
               <span className="config-field-label">Device ID</span>
-              <span className="field-hint">Optional native device identifier. Leave blank to use bridge input only.</span>
+              <span className="field-hint">Optional native device identifier. Leave blank to use the bridge input.</span>
               <input id="config-audio-device-id" name="configAudioDeviceId" type="text" placeholder="default input device" />
             </label>
           </section>
@@ -445,10 +445,10 @@ function ControlApp() {
   );
 }
 
-function SimulatorOnlyControls() {
+function SimulatorControls() {
   return (
-    <section aria-label="Simulator-Only Controls">
-      <h2>Simulator-Only Controls</h2>
+    <section aria-label="Simulator Controls">
+      <h2>Simulator Controls</h2>
       <label>
         Dome visualizer
         <VisualizerSelect id="sandbox-dome-active-vis" name="sandboxDomeActiveVis" />
@@ -498,7 +498,7 @@ function SimulatorApp() {
       <p>
         <a href="/">Back to controls</a>
       </p>
-      <SimulatorOnlyControls />
+      <SimulatorControls />
       <SimulatorFrameView streamText="simulator sandbox" />
     </main>
   );
