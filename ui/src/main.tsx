@@ -236,7 +236,6 @@ function RuntimeControls() {
   return (
     <section aria-label="Runtime Controls">
       <h2>Runtime Controls</h2>
-      <p>These controls update the active engine configuration used by hardware output and the simulator.</p>
       <label>
         Dome visualizer
         <VisualizerSelect id="dome-active-vis" name="domeActiveVis" />
@@ -256,7 +255,6 @@ function PaletteDrawer() {
   return (
     <details id="palette-drawer" aria-label="Palettes">
       <summary>Palettes</summary>
-      <p>Select the active palette, or edit any palette slot directly. The drawer shows all eight Spectrum palette banks at once.</p>
       <label>
         Active palette
         <select id="palette-index" name="colorPaletteIndex">
@@ -302,7 +300,6 @@ function DebugVisualsDrawer() {
   return (
     <details id="debug-visuals-drawer" aria-label="Debug Visuals">
       <summary>Debug Visuals</summary>
-      <p>Debug visuals are hardware-check patterns. Dome debug visuals override the selected dome visualizer while active.</p>
       <label>
         Dome diagnostic
         <select id="dome-test-pattern" name="domeTestPattern">
@@ -362,10 +359,7 @@ function PreviewDrawer() {
   return (
     <details id="preview-drawer">
       <summary>Preview</summary>
-      <p>
-        This preview mirrors the live runtime frame stream used for hardware output. Open the independent sandbox at{' '}
-        <a href="/simulator">/simulator</a>.
-      </p>
+      <p><a href="/simulator">Open simulator sandbox</a></p>
       <SimulatorFrameView streamText="stream disconnected" />
     </details>
   );
@@ -455,12 +449,10 @@ function SimulatorOnlyControls() {
   return (
     <section aria-label="Simulator-Only Controls">
       <h2>Simulator-Only Controls</h2>
-      <p>These controls affect this simulator page only. They do not patch live runtime config or hardware output.</p>
       <label>
         Dome visualizer
         <VisualizerSelect id="sandbox-dome-active-vis" name="sandboxDomeActiveVis" />
       </label>
-      <p>Stage Depth is a stage-output visualizer; it will appear with the stage simulator controls, not the dome canvas selector.</p>
       <label>
         Audio volume preview
         <input id="sandbox-volume" name="sandboxVolume" type="range" min="0" max="1" step="0.01" defaultValue="0.7" />

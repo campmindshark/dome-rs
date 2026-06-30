@@ -8536,7 +8536,6 @@ function ConfigEditor() {
 function RuntimeControls() {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Runtime Controls", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Runtime Controls" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "These controls update the active engine configuration used by hardware output and the simulator." }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
       "Dome visualizer",
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisualizerSelect, { id: "dome-active-vis", name: "domeActiveVis" })
@@ -8551,7 +8550,6 @@ function RuntimeControls() {
 function PaletteDrawer() {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { id: "palette-drawer", "aria-label": "Palettes", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { children: "Palettes" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Select the active palette, or edit any palette slot directly. The drawer shows all eight Spectrum palette banks at once." }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
       "Active palette",
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("select", { id: "palette-index", name: "colorPaletteIndex", children: Array.from({ length: 8 }, (_, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("option", { value: index, children: [
@@ -8583,7 +8581,6 @@ function InputsDrawer() {
 function DebugVisualsDrawer() {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { id: "debug-visuals-drawer", "aria-label": "Debug Visuals", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { children: "Debug Visuals" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Debug visuals are hardware-check patterns. Dome debug visuals override the selected dome visualizer while active." }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
       "Dome diagnostic",
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { id: "dome-test-pattern", name: "domeTestPattern", children: [
@@ -8635,12 +8632,7 @@ function SimulatorFrameView({ streamText }) {
 function PreviewDrawer() {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { id: "preview-drawer", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { children: "Preview" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [
-      "This preview mirrors the live runtime frame stream used for hardware output. Open the independent sandbox at",
-      " ",
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: "/simulator", children: "/simulator" }),
-      "."
-    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: "/simulator", children: "Open simulator sandbox" }) }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SimulatorFrameView, { streamText: "stream disconnected" })
   ] });
 }
@@ -8719,12 +8711,10 @@ function ControlApp() {
 function SimulatorOnlyControls() {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Simulator-Only Controls", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Simulator-Only Controls" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "These controls affect this simulator page only. They do not patch live runtime config or hardware output." }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
       "Dome visualizer",
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VisualizerSelect, { id: "sandbox-dome-active-vis", name: "sandboxDomeActiveVis" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Stage Depth is a stage-output visualizer; it will appear with the stage simulator controls, not the dome canvas selector." }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
       "Audio volume preview",
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "sandbox-volume", name: "sandboxVolume", type: "range", min: "0", max: "1", step: "0.01", defaultValue: "0.7" }),

@@ -134,7 +134,7 @@ for (const marker of [
   'name="domeActiveVis"',
   'TV Static',
   'id="flash-speed"',
-  'mirrors the live runtime frame stream used for hardware output',
+  'Open simulator sandbox',
   'id="palette-index"',
   'id="stream-status"',
   'id="metric-frames"',
@@ -199,14 +199,12 @@ for (const marker of [
   'id="stage-simulator"',
   'aria-label="Simulator-Only Controls"',
   'id="sandbox-dome-active-vis"',
-  'Stage Depth is a stage-output visualizer',
   'id="sandbox-volume"',
   'id="sandbox-beat-progress"',
   'id="sandbox-flash-active"',
   'id="sandbox-palette-primary"',
   'id="sandbox-palette-secondary"',
   'id="sandbox-palette-accent"',
-  'do not patch live runtime config or hardware output',
 ]) {
   if (!app.includes(marker)) {
     console.error(`Missing required simulator page marker: ${marker}`);
