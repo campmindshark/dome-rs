@@ -12,7 +12,7 @@ use axum::{
     routing::{get, patch, post},
     Json, Router,
 };
-use domers_core::EngineConfig;
+use domers_core::{EngineConfig, Rgb};
 use domers_outputs::DomeCommand;
 use domers_visualizers::{render_dome_visualizer, LiveVisualizer, VisualizerInput};
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,7 @@ pub struct Metrics {
 }
 
 /// Serializable server snapshot returned by the HTTP API.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ServerSnapshot {
     /// Whether the engine loop is currently running.
     pub running: bool,
@@ -53,6 +53,8 @@ pub struct ServerSnapshot {
     pub config: EngineConfig,
     /// Runtime counters.
     pub metrics: Metrics,
+    /// Simulator input and palette controls.
+    pub simulator: SimulatorControls,
 }
 
 /// Browser-facing simulator frame.
@@ -86,10 +88,57 @@ pub enum SimulatorCommand {
     },
 }
 
+/// Operator-controlled simulator inputs.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct SimulatorControls {
+    /// Normalized audio volume preview.
+    pub volume: f32,
+    /// Beat phase preview in `[0.0, 1.0)`.
+    pub beat_progress: f64,
+    /// Whether the flash overlay is active.
+    pub flash_active: bool,
+    /// Selected operator palette slot.
+    pub palette_index: u8,
+    /// Primary palette color encoded as `0xRRGGBB`.
+    pub primary: u32,
+    /// Secondary palette color encoded as `0xRRGGBB`.
+    pub secondary: u32,
+    /// Accent palette color encoded as `0xRRGGBB`.
+    pub accent: u32,
+}
+
+impl Default for SimulatorControls {
+    fn default() -> Self {
+        Self {
+            volume: 0.7,
+            beat_progress: 0.25,
+            flash_active: true,
+            palette_index: 0,
+            primary: 0x00_ff_00,
+            secondary: 0x00_80_ff,
+            accent: 0xff_40_80,
+        }
+    }
+}
+
+impl SimulatorControls {
+    fn visualizer_input(self) -> VisualizerInput {
+        VisualizerInput {
+            volume: self.volume,
+            beat_progress: self.beat_progress,
+            flash_active: self.flash_active,
+            primary: Rgb::from_u24(self.primary),
+            secondary: Rgb::from_u24(self.secondary),
+            accent: Rgb::from_u24(self.accent),
+        }
+    }
+}
+
 /// In-process server state shared by HTTP handlers and the engine task.
 #[derive(Clone, Debug, Default)]
 pub struct ServerState {
     config: EngineConfig,
+    simulator: SimulatorControls,
     metrics: Metrics,
     running: bool,
 }
@@ -100,6 +149,15 @@ impl ServerState {
     pub const fn new(config: EngineConfig) -> Self {
         Self {
             config,
+            simulator: SimulatorControls {
+                volume: 0.7,
+                beat_progress: 0.25,
+                flash_active: true,
+                palette_index: 0,
+                primary: 0x00_ff_00,
+                secondary: 0x00_80_ff,
+                accent: 0xff_40_80,
+            },
             metrics: Metrics {
                 frames: 0,
                 simulator_frames: 0,
@@ -117,6 +175,31 @@ impl ServerState {
     /// Patch the active dome visualizer.
     pub fn patch_dome_active_vis(&mut self, dome_active_vis: u8) {
         self.config.dome_active_vis = dome_active_vis;
+    }
+
+    /// Patch simulator input controls.
+    pub fn patch_simulator_controls(&mut self, patch: SimulatorControlsPatch) {
+        if let Some(volume) = patch.volume {
+            self.simulator.volume = volume.clamp(0.0, 1.0);
+        }
+        if let Some(beat_progress) = patch.beat_progress {
+            self.simulator.beat_progress = beat_progress.clamp(0.0, 1.0);
+        }
+        if let Some(flash_active) = patch.flash_active {
+            self.simulator.flash_active = flash_active;
+        }
+        if let Some(palette_index) = patch.palette_index {
+            self.simulator.palette_index = palette_index.min(7);
+        }
+        if let Some(primary) = patch.primary {
+            self.simulator.primary = primary & 0x00ff_ffff;
+        }
+        if let Some(secondary) = patch.secondary {
+            self.simulator.secondary = secondary & 0x00ff_ffff;
+        }
+        if let Some(accent) = patch.accent {
+            self.simulator.accent = accent & 0x00ff_ffff;
+        }
     }
 
     /// Start the engine loop.
@@ -160,7 +243,7 @@ impl ServerState {
             7 => LiveVisualizer::Splat,
             _ => LiveVisualizer::Volume,
         };
-        render_dome_visualizer(visualizer, VisualizerInput::default())
+        render_dome_visualizer(visualizer, self.simulator.visualizer_input())
     }
 
     /// Return a serializable snapshot.
@@ -170,6 +253,7 @@ impl ServerState {
             running: self.running,
             config: self.config.clone(),
             metrics: self.metrics,
+            simulator: self.simulator,
         }
     }
 }
@@ -210,6 +294,8 @@ impl AppRuntime {
             .route("/api/start", post(start_engine))
             .route("/api/stop", post(stop_engine))
             .route("/api/config/dome", patch(patch_dome_config))
+            .route("/api/simulator", patch(patch_simulator_controls))
+            .route("/api/simulator/frame", get(simulator_preview_frame))
             .route("/ws/simulator", get(simulator_websocket))
             .with_state(self)
     }
@@ -254,6 +340,21 @@ impl AppRuntime {
             .lock()
             .await
             .patch_dome_active_vis(dome_active_vis);
+    }
+
+    /// Patch simulator input controls.
+    pub async fn patch_simulator_controls(&self, patch: SimulatorControlsPatch) {
+        self.state.lock().await.patch_simulator_controls(patch);
+    }
+
+    /// Produce one simulator frame immediately.
+    pub async fn simulator_frame(&self) -> SimulatorFrame {
+        let mut state = self.state.lock().await;
+        let commands = state.simulator_frame();
+        SimulatorFrame {
+            metrics: state.metrics(),
+            commands: serialize_commands(commands),
+        }
     }
 
     async fn run_engine_loop(self) {
@@ -318,6 +419,25 @@ struct DomeConfigPatch {
     active_visualizer: Option<u8>,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize)]
+/// Simulator control patch payload.
+pub struct SimulatorControlsPatch {
+    /// Normalized audio volume preview.
+    pub volume: Option<f32>,
+    /// Beat phase preview in `[0.0, 1.0)`.
+    pub beat_progress: Option<f64>,
+    /// Whether the flash overlay is active.
+    pub flash_active: Option<bool>,
+    /// Selected operator palette slot.
+    pub palette_index: Option<u8>,
+    /// Primary palette color encoded as `0xRRGGBB`.
+    pub primary: Option<u32>,
+    /// Secondary palette color encoded as `0xRRGGBB`.
+    pub secondary: Option<u32>,
+    /// Accent palette color encoded as `0xRRGGBB`.
+    pub accent: Option<u32>,
+}
+
 async fn index_html() -> Html<&'static str> {
     Html(include_str!("../../../ui/index.html"))
 }
@@ -355,6 +475,18 @@ async fn patch_dome_config(
         runtime.patch_dome_active_vis(active_visualizer).await;
     }
     Json(runtime.snapshot().await)
+}
+
+async fn patch_simulator_controls(
+    State(runtime): State<AppRuntime>,
+    Json(patch): Json<SimulatorControlsPatch>,
+) -> Json<ServerSnapshot> {
+    runtime.patch_simulator_controls(patch).await;
+    Json(runtime.snapshot().await)
+}
+
+async fn simulator_preview_frame(State(runtime): State<AppRuntime>) -> Json<SimulatorFrame> {
+    Json(runtime.simulator_frame().await)
 }
 
 async fn simulator_websocket(
@@ -410,7 +542,7 @@ mod tests {
     use tokio::net::TcpListener;
     use tokio::time;
 
-    use super::{health, serve_listener, AppRuntime, ServerState};
+    use super::{health, serve_listener, AppRuntime, ServerState, SimulatorCommand};
 
     #[test]
     fn health_is_ok() {
@@ -434,6 +566,30 @@ mod tests {
         assert_eq!(state.metrics().simulator_frames, 1);
     }
 
+    #[test]
+    fn patches_simulator_controls_and_palette() {
+        let mut state = ServerState::default();
+        state.patch_simulator_controls(super::SimulatorControlsPatch {
+            volume: Some(0.25),
+            beat_progress: Some(0.75),
+            flash_active: Some(false),
+            palette_index: Some(3),
+            primary: Some(0xff_00_00),
+            secondary: Some(0x00_ff_00),
+            accent: Some(0x00_00_ff),
+        });
+
+        let snapshot = state.snapshot();
+
+        assert!((snapshot.simulator.volume - 0.25).abs() < f32::EPSILON);
+        assert!((snapshot.simulator.beat_progress - 0.75).abs() < f64::EPSILON);
+        assert!(!snapshot.simulator.flash_active);
+        assert_eq!(snapshot.simulator.palette_index, 3);
+        assert_eq!(snapshot.simulator.primary, 0xff_00_00);
+        assert_eq!(snapshot.simulator.secondary, 0x00_ff_00);
+        assert_eq!(snapshot.simulator.accent, 0x00_00_ff);
+    }
+
     #[tokio::test]
     async fn runtime_start_streams_frames_and_stop_halts() {
         let runtime = AppRuntime::default();
@@ -451,6 +607,20 @@ mod tests {
 
         runtime.stop().await;
         assert!(!runtime.snapshot().await.running);
+    }
+
+    #[tokio::test]
+    async fn runtime_preview_frame_is_visible_without_starting() {
+        let runtime = AppRuntime::default();
+        let frame = runtime.simulator_frame().await;
+
+        assert!(!runtime.snapshot().await.running);
+        assert!(frame.commands.iter().any(|command| {
+            matches!(
+                command,
+                SimulatorCommand::Frame { .. } | SimulatorCommand::Pixel { .. }
+            )
+        }));
     }
 
     #[tokio::test]

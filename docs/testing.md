@@ -21,7 +21,7 @@ node ui/check.mjs
 - Visualizer simulator-frame harness for live dome modes.
 - Server state contract for config patching, start/stop, metrics, and simulator frames.
 - HTTP adapter smoke coverage for UI, state, and start routes.
-- UI smoke markers for API/WebSocket wiring in the browser shell.
+- UI smoke markers for API/WebSocket wiring, pixel rendering, palette controls, and simulator controls.
 
 Tests for intentional behavior changes cite
 [`intentional-deviations.md`](intentional-deviations.md) so preservation and

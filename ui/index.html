@@ -23,6 +23,16 @@
         display: block;
         margin: 0.75rem 0;
       }
+      fieldset {
+        border: 1px solid #444;
+        margin: 1rem 0;
+        padding: 1rem;
+      }
+      .swatches {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      }
     </style>
   </head>
   <body>
@@ -53,6 +63,50 @@
           <input id="flash-speed" name="flashSpeed" type="range" min="0" max="8" step="0.125" value="0" />
           <output id="flash-speed-value" for="flash-speed">0</output>
         </label>
+        <label>
+          Audio volume preview
+          <input id="sim-volume" name="simVolume" type="range" min="0" max="1" step="0.01" value="0.7" />
+          <output id="sim-volume-value" for="sim-volume">0.7</output>
+        </label>
+        <label>
+          Beat phase preview
+          <input id="sim-beat-progress" name="simBeatProgress" type="range" min="0" max="1" step="0.01" value="0.25" />
+          <output id="sim-beat-progress-value" for="sim-beat-progress">0.25</output>
+        </label>
+        <label>
+          <input id="sim-flash-active" name="simFlashActive" type="checkbox" checked />
+          Flash overlay active
+        </label>
+        <label>
+          Palette slot
+          <select id="palette-index" name="colorPaletteIndex">
+            <option value="0">Palette 1</option>
+            <option value="1">Palette 2</option>
+            <option value="2">Palette 3</option>
+            <option value="3">Palette 4</option>
+            <option value="4">Palette 5</option>
+            <option value="5">Palette 6</option>
+            <option value="6">Palette 7</option>
+            <option value="7">Palette 8</option>
+          </select>
+        </label>
+        <fieldset>
+          <legend>Palette colors</legend>
+          <div class="swatches">
+            <label>
+              Primary
+              <input id="palette-primary" name="palettePrimary" type="color" value="#00ff00" />
+            </label>
+            <label>
+              Secondary
+              <input id="palette-secondary" name="paletteSecondary" type="color" value="#0080ff" />
+            </label>
+            <label>
+              Accent / flash
+              <input id="palette-accent" name="paletteAccent" type="color" value="#ff4080" />
+            </label>
+          </div>
+        </fieldset>
       </section>
       <section aria-label="Metrics">
         <p>Engine frames: <span id="metric-frames" class="metric">0</span></p>

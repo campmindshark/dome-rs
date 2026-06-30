@@ -77,12 +77,12 @@ Spectrum managed Madmom for the operator: it found the bundled tracker, started 
 
 ## UI
 
-The browser shell exposes engine start/stop, dome visualizer selection, flash speed, metrics, and a WebSocket-backed dome simulator canvas. See [`docs/ui-expectations.md`](docs/ui-expectations.md) for expected UI states and image placeholders.
+The browser shell exposes engine start/stop, dome visualizer selection, flash speed, simulator input controls, palette preview controls, metrics, and a WebSocket-backed dome simulator canvas. See [`docs/ui-expectations.md`](docs/ui-expectations.md) for expected UI states, remaining parity controls, and image placeholders.
 
 TODO: Add image of the Domers operator page here.
 
 - Capture: full browser window at desktop size.
-- Expected: title, start/stop buttons, dome visualizer selector, flash speed slider, metrics, stream status, and simulator canvas are visible.
+- Expected: title, start/stop buttons, dome visualizer selector, flash speed slider, simulator controls, palette controls, metrics, stream status, and simulator canvas are visible.
 - Suggested file: `docs/images/readme-operator-shell.png`.
 
 Local Docker/Rust may not be installed on every workstation; GitHub Actions is the merge-blocking source of truth.

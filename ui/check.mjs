@@ -34,6 +34,13 @@ for (const marker of [
   'id="stop-engine"',
   'name="domeActiveVis"',
   'id="flash-speed"',
+  'id="sim-volume"',
+  'id="sim-beat-progress"',
+  'id="sim-flash-active"',
+  'id="palette-index"',
+  'id="palette-primary"',
+  'id="palette-secondary"',
+  'id="palette-accent"',
   'id="stream-status"',
   'id="metric-frames"',
   'id="metric-simulator-frames"',
@@ -52,7 +59,10 @@ for (const marker of [
   '/api/start',
   '/api/stop',
   '/api/config/dome',
+  '/api/simulator',
+  '/api/simulator/frame',
   '/ws/simulator',
+  'command.kind === \'pixel\'',
 ]) {
   if (!js.includes(marker)) {
     console.error(`Missing required API marker: ${marker}`);

@@ -3,6 +3,15 @@ const streamStatus = document.querySelector('#stream-status');
 const activeVisualizer = document.querySelector('#dome-active-vis');
 const flashSpeed = document.querySelector('#flash-speed');
 const flashSpeedValue = document.querySelector('#flash-speed-value');
+const simVolume = document.querySelector('#sim-volume');
+const simVolumeValue = document.querySelector('#sim-volume-value');
+const simBeatProgress = document.querySelector('#sim-beat-progress');
+const simBeatProgressValue = document.querySelector('#sim-beat-progress-value');
+const simFlashActive = document.querySelector('#sim-flash-active');
+const paletteIndex = document.querySelector('#palette-index');
+const palettePrimary = document.querySelector('#palette-primary');
+const paletteSecondary = document.querySelector('#palette-secondary');
+const paletteAccent = document.querySelector('#palette-accent');
 const metricFrames = document.querySelector('#metric-frames');
 const metricSimulatorFrames = document.querySelector('#metric-simulator-frames');
 const canvas = document.querySelector('#dome-simulator');
@@ -24,6 +33,31 @@ function updateSnapshot(snapshot) {
   metricFrames.textContent = String(snapshot.metrics.frames);
   metricSimulatorFrames.textContent = String(snapshot.metrics.simulator_frames);
   activeVisualizer.value = String(snapshot.config.dome_active_vis);
+  simVolume.value = String(snapshot.simulator.volume);
+  simVolumeValue.textContent = String(snapshot.simulator.volume);
+  simBeatProgress.value = String(snapshot.simulator.beat_progress);
+  simBeatProgressValue.textContent = String(snapshot.simulator.beat_progress);
+  simFlashActive.checked = snapshot.simulator.flash_active;
+  paletteIndex.value = String(snapshot.simulator.palette_index);
+  palettePrimary.value = toColorInput(snapshot.simulator.primary);
+  paletteSecondary.value = toColorInput(snapshot.simulator.secondary);
+  paletteAccent.value = toColorInput(snapshot.simulator.accent);
+}
+
+function toColorInput(color) {
+  return `#${color.toString(16).padStart(6, '0')}`;
+}
+
+function fromColorInput(color) {
+  return Number.parseInt(color.replace('#', ''), 16);
+}
+
+function clearCanvas() {
+  if (!context) {
+    return;
+  }
+  context.fillStyle = '#000000';
+  context.fillRect(0, 0, canvas.width, canvas.height);
 }
 
 function drawFrame(colors) {
@@ -43,19 +77,57 @@ function drawFrame(colors) {
   });
 }
 
+function drawPixel(command) {
+  if (!context) {
+    return;
+  }
+
+  const columns = 20;
+  const cellSize = canvas.width / columns;
+  const index = command.strut_index * 3 + command.led_index;
+  const x = (index % columns) * cellSize + cellSize / 2;
+  const y = Math.floor(index / columns) * cellSize + cellSize / 2;
+  context.fillStyle = toColorInput(command.color);
+  context.beginPath();
+  context.arc(x, y, Math.max(5, cellSize * 0.3), 0, Math.PI * 2);
+  context.fill();
+}
+
 function handleSimulatorFrame(frame) {
   metricFrames.textContent = String(frame.metrics.frames);
   metricSimulatorFrames.textContent = String(frame.metrics.simulator_frames);
+  clearCanvas();
 
   for (const command of frame.commands) {
     if (command.kind === 'frame') {
       drawFrame(command.colors);
+    } else if (command.kind === 'pixel') {
+      drawPixel(command);
     }
   }
 }
 
 async function refreshState() {
-  updateSnapshot(await request('/api/state'));
+  const snapshot = await request('/api/state');
+  updateSnapshot(snapshot);
+  handleSimulatorFrame(await request('/api/simulator/frame'));
+}
+
+async function patchSimulatorControls() {
+  const snapshot = await request('/api/simulator', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      volume: Number(simVolume.value),
+      beat_progress: Number(simBeatProgress.value),
+      flash_active: simFlashActive.checked,
+      palette_index: Number(paletteIndex.value),
+      primary: fromColorInput(palettePrimary.value),
+      secondary: fromColorInput(paletteSecondary.value),
+      accent: fromColorInput(paletteAccent.value),
+    }),
+  });
+  updateSnapshot(snapshot);
+  handleSimulatorFrame(await request('/api/simulator/frame'));
 }
 
 function connectSimulatorStream() {
@@ -92,11 +164,28 @@ activeVisualizer?.addEventListener('change', async () => {
       body: JSON.stringify({ active_visualizer: Number(activeVisualizer.value) }),
     }),
   );
+  handleSimulatorFrame(await request('/api/simulator/frame'));
 });
 
 flashSpeed?.addEventListener('input', () => {
   flashSpeedValue.textContent = flashSpeed.value;
 });
+
+for (const input of [
+  simVolume,
+  simBeatProgress,
+  simFlashActive,
+  paletteIndex,
+  palettePrimary,
+  paletteSecondary,
+  paletteAccent,
+]) {
+  input?.addEventListener('input', async () => {
+    simVolumeValue.textContent = simVolume.value;
+    simBeatProgressValue.textContent = simBeatProgress.value;
+    await patchSimulatorControls();
+  });
+}
 
 await refreshState();
 connectSimulatorStream();

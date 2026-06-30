@@ -97,6 +97,12 @@ pub struct VisualizerInput {
     pub beat_progress: f64,
     /// Whether a MIDI flash note is active.
     pub flash_active: bool,
+    /// Primary operator palette color.
+    pub primary: Rgb,
+    /// Secondary operator palette color.
+    pub secondary: Rgb,
+    /// Accent operator palette color.
+    pub accent: Rgb,
 }
 
 impl Default for VisualizerInput {
@@ -105,6 +111,9 @@ impl Default for VisualizerInput {
             volume: 0.5,
             beat_progress: 0.25,
             flash_active: true,
+            primary: Rgb::from_u24(0x00_ff_00),
+            secondary: Rgb::from_u24(0x00_80_ff),
+            accent: Rgb::from_u24(0xff_40_80),
         }
     }
 }
@@ -122,33 +131,31 @@ pub fn render_dome_visualizer(
             sink.set_pixel(1, 0, Rgb::BLACK);
         }
         LiveVisualizer::Volume => {
-            sink.set_pixel(0, 0, Rgb::from_u24(0x00_ff_00).scale(input.volume));
+            sink.set_pixel(0, 0, input.primary.scale(input.volume));
         }
         LiveVisualizer::Flash => {
             if input.flash_active {
-                sink.set_pixel(2, 0, Rgb::from_u24(0xff_ff_ff));
+                sink.set_pixel(2, 0, input.accent);
             }
         }
-        LiveVisualizer::Radial => sink.write_buffer(vec![
-            Rgb::from_u24(0xff_00_00),
-            Rgb::from_u24(0x00_ff_00),
-            Rgb::from_u24(0x00_00_ff),
-        ]),
-        LiveVisualizer::Splat => sink.write_buffer(vec![Rgb::from_u24(0xff_80_00)]),
+        LiveVisualizer::Radial => {
+            sink.write_buffer(vec![input.primary, input.secondary, input.accent]);
+        }
+        LiveVisualizer::Splat => sink.write_buffer(vec![input.accent]),
         LiveVisualizer::Race => {
             let strut = if input.beat_progress < 0.5 { 3 } else { 4 };
-            sink.set_pixel(strut, 0, Rgb::from_u24(0xff_00_ff));
+            sink.set_pixel(strut, 0, input.accent);
         }
         LiveVisualizer::Snakes => {
-            sink.set_pixel(5, 0, Rgb::from_u24(0x00_ff_ff));
-            sink.set_pixel(6, 0, Rgb::from_u24(0x00_80_80));
+            sink.set_pixel(5, 0, input.primary);
+            sink.set_pixel(6, 0, input.secondary);
         }
-        LiveVisualizer::QuaternionTest => sink.write_buffer(vec![Rgb::from_u24(0x10_20_30)]),
+        LiveVisualizer::QuaternionTest => sink.write_buffer(vec![input.secondary]),
         LiveVisualizer::QuaternionMultiTest => {
-            sink.write_buffer(vec![Rgb::from_u24(0x10_00_00), Rgb::from_u24(0x00_10_00)]);
+            sink.write_buffer(vec![input.primary, input.secondary]);
         }
         LiveVisualizer::QuaternionPaintbrush => {
-            sink.write_buffer(vec![Rgb::from_u24(0xff_00_80)]);
+            sink.write_buffer(vec![input.accent]);
         }
     }
     sink.flush();
