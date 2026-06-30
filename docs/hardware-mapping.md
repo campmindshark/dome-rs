@@ -5,7 +5,7 @@ Hardware mapping is treated as fixture data, not an implementation detail to red
 Known constants from Spectrum inventory:
 
 - Dome: 190 struts, 71 projection vertices.
-- Bar: routed through dome OPC control box 5 in current operator wiring.
+- Bar: routed through dome OPC control box 5 in operator wiring.
 - Stage: 48 sides, 3 layers.
 - OPC: Spectrum firmware expects `[channel][0][len_hi][len_lo][RGB...]`, without the usual `0xff` prefix.
 
@@ -31,7 +31,7 @@ That packet means:
 - payload length: `0x0006`
 - RGB payload: `0x123456`, `0xaabbcc`
 
-Future fixture captures must include every logical-to-device mapping used by dome, bar, and stage outputs.
+Fixture captures must include every logical-to-device mapping used by dome, bar, and stage outputs.
 
 ## TODO Images
 

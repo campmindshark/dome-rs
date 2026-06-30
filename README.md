@@ -2,15 +2,15 @@
 
 Rust rewrite of Camp Mindshark Spectrum lighting control.
 
-## Current Status
+## Status
 
-Domers now runs as a no-hardware operator app:
+Domers runs without lighting hardware:
 
 - TOML config loading from `examples/domers.toml` or an imported config
 - HTTP API for health, state, start, stop, and dome visualizer config
 - WebSocket simulator frame stream
 - browser operator shell served by the Rust binary
-- tested scheduler, OPC, input, simulator, visualizer, migration, and server seams
+- tested scheduler, OPC, input, simulator, visualizer, migration, and server paths
 
 Run locally:
 
@@ -73,13 +73,13 @@ Intentional differences from Spectrum are tracked in
 
 ## Madmom
 
-The old Windows app searched for a bundled Python 3.7 virtualenv at `Madmom/env/Scripts/python.exe` and spawned `DBNBeatTracker`, then parsed `BEAT:{seconds}` lines from stdout. Domers preserves that sidecar protocol for compatibility, but the command/path is config-driven in TOML instead of being hard-coded to the Windows bundle. A future native Rust beat tracker can replace the sidecar behind the same beat input contract.
+The old Windows app searched for a bundled Python 3.7 virtualenv at `Madmom/env/Scripts/python.exe` and spawned `DBNBeatTracker`, then parsed `BEAT:{seconds}` lines from stdout. Domers preserves that sidecar protocol for compatibility, but the command/path is config-driven in TOML instead of being hard-coded to the Windows bundle. A native Rust beat tracker can use the same beat input contract later.
 
-## UI Reference
+## UI
 
 The browser shell exposes engine start/stop, dome visualizer selection, flash speed, metrics, and a WebSocket-backed dome simulator canvas. See [`docs/ui-expectations.md`](docs/ui-expectations.md) for expected UI states and image placeholders.
 
-TODO: Add image of the initial Domers operator page here.
+TODO: Add image of the Domers operator page here.
 
 - Capture: full browser window at desktop size.
 - Expected: title, start/stop buttons, dome visualizer selector, flash speed slider, metrics, stream status, and simulator canvas are visible.

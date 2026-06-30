@@ -23,11 +23,11 @@ Browser UI -> Server contract -> Engine scheduler -> Inputs + Visualizers -> Out
 
 The browser simulator is driven by engine frame data. It does not read back from OPC hardware sockets.
 
-## Current Implementation Status
+## Runtime Surface
 
 The server crate implements both the in-process `ServerState` contract and the runnable HTTP/WebSocket adapter. The `domers` binary loads TOML config, serves the browser shell, exposes JSON API endpoints, and streams simulator frames over WebSocket.
 
-Current network surface:
+Network surface:
 
 - `GET /`: browser operator shell
 - `GET /main.mjs`: browser control script
@@ -44,7 +44,7 @@ Current network surface:
 - OPC target: independent 200 Hz send cap.
 - Browser simulator: throttled stream derived from engine frames.
 
-Example future timing test shape:
+Timing tests use this shape:
 
 ```text
 fake clock -> scheduler frame -> visualizer render -> simulator frame -> metrics update
@@ -52,9 +52,9 @@ fake clock -> scheduler frame -> visualizer render -> simulator frame -> metrics
 
 ## State And Concurrency
 
-The engine should process each frame from a stable config snapshot plus a drained batch of input/control events. Browser config edits, MIDI commands, audio samples, orientation datagrams, and Madmom beat reports should enter through explicit event paths instead of mutating shared UI state mid-frame.
+Each engine frame uses a stable config snapshot plus a drained batch of input/control events. Browser config edits, MIDI commands, audio samples, orientation datagrams, and Madmom beat reports enter through explicit event paths instead of mutating shared UI state mid-frame.
 
-Stress tests should cover:
+Stress tests cover:
 
 - config updates during frame production
 - MIDI replay during visualizer rendering
@@ -63,7 +63,7 @@ Stress tests should cover:
 
 ## Configuration
 
-Domers-native configuration is TOML. Runtime code should load TOML, not XML. Legacy Spectrum XML is handled only by the import command documented in [`configuration.md`](configuration.md).
+Domers-native configuration is TOML. Runtime code loads TOML, not XML. Legacy Spectrum XML is handled only by the import command documented in [`configuration.md`](configuration.md).
 
 ## Beat Input
 

@@ -55,7 +55,7 @@ TODO: Add image of expected stage side/layer diagnostic.
 
 TODO: Add image of expected input status panel.
 
-- Capture: UI showing MIDI/audio/Madmom/orientation status once implemented.
+- Capture: UI showing MIDI/audio/Madmom/orientation status.
 - Expected: each input source has a clear connected/active state.
 - Suggested file: `docs/images/readiness-input-status.png`.
 

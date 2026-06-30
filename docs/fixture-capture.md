@@ -2,7 +2,7 @@
 
 M0 captures C# references before Rust behavior is trusted.
 
-## Current Capture Command
+## Capture Command
 
 ```sh
 python3 tools/extract_spectrum_fixtures.py

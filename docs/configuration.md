@@ -50,7 +50,7 @@ command = "DBNBeatTracker"
 audio_input_index = 0
 ```
 
-Use TOML because it is common in Rust projects, easy to diff, and strict enough for operator-facing config. Avoid YAML for runtime config unless a future feature needs comments with richer nested operator-authored structures that TOML cannot express cleanly.
+TOML fits the project well: it is common in Rust, easy to diff, and strict enough for operator-edited config.
 
 ## Import Existing Spectrum XML
 
@@ -94,7 +94,7 @@ command = "DBNBeatTracker"
 audio_input_index = 0
 ```
 
-The command can point at a Python wrapper, a virtualenv executable, a script, or a future native replacement. The stable contract is stdout lines shaped like:
+The command can point at a Python wrapper, a virtualenv executable, a script, or a native replacement. The stable contract is stdout lines shaped like:
 
 ```text
 BEAT:12.345

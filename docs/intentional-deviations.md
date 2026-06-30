@@ -22,7 +22,7 @@ cargo run --bin domers-config -- import-spectrum-xml <spectrum.xml> <domers.toml
 
 **Domers:** The beat protocol remains `BEAT:{seconds}`, but the command/path is configured in TOML under `[madmom]`. Domers does not assume the Windows virtualenv layout.
 
-**Reason:** Keeping the stdout protocol preserves compatibility with Python Madmom or a wrapper script, while making the app portable and replaceable with a future native Rust beat detector.
+**Reason:** Keeping the stdout protocol preserves compatibility with Python Madmom or a wrapper script, while leaving room for a native Rust beat detector.
 
 **Validation:** `domers-inputs` parses valid and malformed `BEAT:` lines; `domers-core` tests Madmom beat timing windows.
 
@@ -32,7 +32,7 @@ cargo run --bin domers-config -- import-spectrum-xml <spectrum.xml> <domers.toml
 
 **Domers:** Browser simulator frames come from the engine/server simulator stream. The browser does not read OPC hardware sockets.
 
-**Reason:** The simulator should be testable without hardware and should display intended engine output, not network side effects.
+**Reason:** The simulator needs to run without hardware and display intended engine output, not network side effects.
 
 **Validation:** `domers-outputs` tests simulation-only `WriteBuffer` command emission. `domers-server` tests simulator frame production from server state.
 
@@ -40,11 +40,11 @@ cargo run --bin domers-config -- import-spectrum-xml <spectrum.xml> <domers.toml
 
 **Spectrum:** WPF controls, MIDI callbacks, timers, and operator code share a mutable config object with property-change notifications.
 
-**Domers:** The engine should use frame-local config snapshots and event channels for UI edits and input events.
+**Domers:** The engine uses frame-local config snapshots and event channels for UI edits and input events.
 
 **Reason:** Snapshot/event flow avoids torn config reads when browser controls, MIDI events, and visualizer rendering happen concurrently.
 
-**Validation:** Current tests cover deterministic scheduler and server state behavior. Future stress tests should exercise concurrent config patching, MIDI replay, and simulator frame generation.
+**Validation:** Tests cover deterministic scheduler and server state behavior. Remaining stress coverage: concurrent config patching, MIDI replay, and simulator frame generation.
 
 ## Timing Targets Kept From Spectrum
 
@@ -55,4 +55,4 @@ Domers keeps the 400 Hz engine compute cap and 200 Hz OPC send cap as compatibil
 - `spectrum/Spectrum/Operator.cs` defines `MaxFramesPerSecond = 400` and comments that the operator loop runs no faster than 400 Hz.
 - `spectrum/LEDs/OPCAPI.cs` defines `MaxRefreshRateHz = 200` and comments that OPC wire rate is independent of engine compute.
 
-**Validation:** Current scheduler tests are deterministic; future timing tests should use fake clocks for frame flow and measured soak tests for runtime limits.
+**Validation:** Scheduler tests are deterministic. Remaining timing coverage: fake-clock frame tests and measured soak tests for runtime limits.

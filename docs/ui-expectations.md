@@ -1,10 +1,10 @@
 # UI Expectations
 
-This document records what the browser UI should show as it evolves. Add screenshots here whenever a UI state becomes stable enough for comparison.
+This document records the browser UI states worth checking. Add screenshots when a state is stable enough for comparison.
 
-## Initial Operator Shell
+## Operator Shell
 
-The initial shell lives in `ui/index.html` and is checked by `node ui/check.mjs`.
+The shell lives in `ui/index.html` and is checked by `node ui/check.mjs`.
 
 Expected elements:
 
@@ -17,11 +17,11 @@ Expected elements:
 - frame and simulator-frame metrics
 - `dome-simulator` canvas using the WebSocket frame source
 
-TODO: Add image of the initial operator shell.
+TODO: Add image of the operator shell.
 
 - Capture: browser window at desktop size.
 - Expected: all controls above are visible, simulator canvas is black/empty before frames arrive.
-- Suggested file: `docs/images/ui-initial-operator-shell.png`.
+- Suggested file: `docs/images/ui-operator-shell.png`.
 
 ## Running Engine State
 
@@ -45,7 +45,7 @@ Expected behavior when selecting each dome visualizer:
 
 - selected value matches the server config field `dome.active_visualizer`
 - simulator frame stream updates after the selection is applied
-- invalid values should be rejected by the API layer once config validation is tightened
+- invalid values are rejected after API config validation is tightened
 
 TODO: Add image sequence of the visualizer selector.
 
@@ -67,9 +67,9 @@ TODO: Add image of a non-empty dome simulator frame.
 - Expected: visible colored points/struts, with the selected visualizer noted in the caption.
 - Suggested file: `docs/images/ui-dome-simulator-frame.png`.
 
-## Future UI Sections
+## Planned UI Sections
 
-Add screenshots and notes as these sections become real:
+Add screenshots and notes as these sections land:
 
 - config editor
 - MIDI log

@@ -7,7 +7,7 @@ This directory will hold no-hardware integration services:
 - fake orientation UDP emitter
 - integration runner
 
-The initial CI validates the layout; later increments replace this placeholder with Docker Compose services.
+CI validates the layout now. Docker Compose services can replace this placeholder as loopback coverage grows.
 
 ## Planned Example
 
@@ -15,7 +15,7 @@ The initial CI validates the layout; later increments replace this placeholder w
 docker compose -f docker/ci/docker-compose.yml up --abort-on-container-exit
 ```
 
-Expected future services:
+Planned services:
 
 ```text
 server-under-test -> opc-listener

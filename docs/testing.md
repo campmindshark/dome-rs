@@ -11,21 +11,21 @@ cargo test --workspace
 node ui/check.mjs
 ```
 
-## What The Current Suite Covers
+## Covered
 
 - TOML config round-trips and Spectrum XML import warnings.
 - Scheduler priority rules: priority `0`, priority ties, diagnostics, disabled inputs, and output activation.
 - OPC non-standard frame encoding and persistent sparse flush behavior.
 - Simulator command emission with hardware disabled.
 - Fake audio, MIDI, orientation, and Madmom beat inputs.
-- Visualizer simulator-frame harness for initial live dome modes.
+- Visualizer simulator-frame harness for live dome modes.
 - Server state contract for config patching, start/stop, metrics, and simulator frames.
-- Real HTTP adapter smoke coverage for UI, state, and start routes.
+- HTTP adapter smoke coverage for UI, state, and start routes.
 - UI smoke markers for API/WebSocket wiring in the browser shell.
 
-Tests for intentional behavior changes should cite
-[`intentional-deviations.md`](intentional-deviations.md) so it is clear whether
-Domers is preserving Spectrum behavior or deliberately replacing it.
+Tests for intentional behavior changes cite
+[`intentional-deviations.md`](intentional-deviations.md) so preservation and
+replacement decisions stay visible.
 
 ## Example Local Run
 
@@ -45,7 +45,7 @@ Then open `http://127.0.0.1:3000`, click `Start`, and confirm the metrics advanc
 
 ## PR Full And Nightly
 
-Later increments add deeper fixture golden tests, real Docker Compose OPC loopback services, fake Madmom sidecar process tests, fake orientation sender services, visualizer frame hash snapshots, browser automation, and load tests.
+Next additions: deeper fixture golden tests, Docker Compose OPC loopback services, fake Madmom sidecar process tests, fake orientation sender services, visualizer frame hash snapshots, browser automation, and load tests.
 
 ## Manual Hardware Checklist
 
