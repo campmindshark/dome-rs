@@ -142,7 +142,10 @@ function ConfigEditor() {
             </label>
             <label className="config-field">
               <span className="config-field-label">Brightness</span>
-              <input id="config-dome-brightness" name="configDomeBrightness" type="number" min="0" max="1" step="0.01" />
+              <div className="slider-number-field">
+                <input id="config-dome-brightness-slider" name="configDomeBrightnessSlider" type="range" min="0" max="1" step="0.01" />
+                <input id="config-dome-brightness" name="configDomeBrightness" type="number" min="0" max="1" step="0.01" />
+              </div>
             </label>
           </section>
           <section className="config-card" aria-label="Bar output config">
@@ -171,7 +174,10 @@ function ConfigEditor() {
             </div>
             <label className="config-field">
               <span className="config-field-label">Brightness</span>
-              <input id="config-bar-brightness" name="configBarBrightness" type="number" min="0" max="1" step="0.01" />
+              <div className="slider-number-field">
+                <input id="config-bar-brightness-slider" name="configBarBrightnessSlider" type="range" min="0" max="1" step="0.01" />
+                <input id="config-bar-brightness" name="configBarBrightness" type="number" min="0" max="1" step="0.01" />
+              </div>
             </label>
           </section>
           <section className="config-card" aria-label="Stage output config">
@@ -190,8 +196,15 @@ function ConfigEditor() {
             </label>
             <label className="config-field">
               <span className="config-field-label">Brightness</span>
-              <input id="config-stage-brightness" name="configStageBrightness" type="number" min="0" max="1" step="0.01" />
+              <div className="slider-number-field">
+                <input id="config-stage-brightness-slider" name="configStageBrightnessSlider" type="range" min="0" max="1" step="0.01" />
+                <input id="config-stage-brightness" name="configStageBrightness" type="number" min="0" max="1" step="0.01" />
+              </div>
             </label>
+          </section>
+          <section className="config-card stage-layout-card" aria-label="Stage layout config">
+            <h3>Stage Layout</h3>
+            <p className="field-hint">These side lengths belong to the stage. They are physical layout values, not dome settings.</p>
             <div className="config-field stage-side-lengths-editor">
               <span className="config-field-label">Side lengths</span>
               <span className="field-hint">One numeric input per stage side. Values update the full config JSON when you apply structured config.</span>

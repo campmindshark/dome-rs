@@ -7365,9 +7365,7 @@ function updateStructuredConfigFields(config) {
   if (configDomeOpcAddress) {
     configDomeOpcAddress.value = config.dome?.opc_address ?? "";
   }
-  if (configDomeBrightness) {
-    configDomeBrightness.value = config.dome?.brightness ?? "";
-  }
+  setBrightnessControls(configDomeBrightnessSlider, configDomeBrightness, config.dome?.brightness);
   if (configBarEnabled) {
     configBarEnabled.checked = Boolean(config.bar?.enabled);
   }
@@ -7383,9 +7381,7 @@ function updateStructuredConfigFields(config) {
   if (configBarRunnerLength) {
     configBarRunnerLength.value = config.bar?.runner_length ?? "";
   }
-  if (configBarBrightness) {
-    configBarBrightness.value = config.bar?.brightness ?? "";
-  }
+  setBrightnessControls(configBarBrightnessSlider, configBarBrightness, config.bar?.brightness);
   if (configStageEnabled) {
     configStageEnabled.checked = Boolean(config.stage?.enabled);
   }
@@ -7395,9 +7391,7 @@ function updateStructuredConfigFields(config) {
   if (configStageOpcAddress) {
     configStageOpcAddress.value = config.stage?.opc_address ?? "";
   }
-  if (configStageBrightness) {
-    configStageBrightness.value = config.stage?.brightness ?? "";
-  }
+  setBrightnessControls(configStageBrightnessSlider, configStageBrightness, config.stage?.brightness);
   if (configStageSideLengths) {
     configStageSideLengths.value = (config.stage?.side_lengths ?? []).join(", ");
   }
@@ -7428,6 +7422,27 @@ function numberOrFallback(value, fallback) {
 function integerOrFallback(value, fallback) {
   const parsed = numberOrFallback(value, fallback);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+function setBrightnessControls(slider, numberInput, value) {
+  const normalized = Number.isFinite(Number(value)) ? String(Number(value)) : "";
+  if (slider) {
+    slider.value = normalized || "0";
+  }
+  if (numberInput) {
+    numberInput.value = normalized;
+  }
+}
+function readBrightnessControl(numberInput, fallback) {
+  return Math.min(1, Math.max(0, numberOrFallback(numberInput?.value ?? "", fallback)));
+}
+function bindBrightnessControls(slider, numberInput) {
+  const sync = (source, target) => {
+    if (source && target) {
+      target.value = source.value;
+    }
+  };
+  slider?.addEventListener("input", () => sync(slider, numberInput));
+  numberInput?.addEventListener("input", () => sync(numberInput, slider));
 }
 function parseIntegerList(value, fallback) {
   const trimmed = value.trim();
@@ -7529,17 +7544,17 @@ function updateConfigFromStructuredFields() {
   config.dome.enabled = Boolean(configDomeEnabled?.checked);
   config.dome.simulation_enabled = Boolean(configDomeSimulationEnabled?.checked);
   config.dome.opc_address = configDomeOpcAddress?.value?.trim() ?? "";
-  config.dome.brightness = numberOrFallback(configDomeBrightness?.value ?? "", config.dome.brightness ?? 0);
+  config.dome.brightness = readBrightnessControl(configDomeBrightness, config.dome.brightness ?? 0);
   config.bar.enabled = Boolean(configBarEnabled?.checked);
   config.bar.simulation_enabled = Boolean(configBarSimulationEnabled?.checked);
   config.bar.infinity_length = integerOrFallback(configBarInfinityLength?.value ?? "", config.bar.infinity_length ?? 0);
   config.bar.infinity_width = integerOrFallback(configBarInfinityWidth?.value ?? "", config.bar.infinity_width ?? 0);
   config.bar.runner_length = integerOrFallback(configBarRunnerLength?.value ?? "", config.bar.runner_length ?? 0);
-  config.bar.brightness = numberOrFallback(configBarBrightness?.value ?? "", config.bar.brightness ?? 0);
+  config.bar.brightness = readBrightnessControl(configBarBrightness, config.bar.brightness ?? 0);
   config.stage.enabled = Boolean(configStageEnabled?.checked);
   config.stage.simulation_enabled = Boolean(configStageSimulationEnabled?.checked);
   config.stage.opc_address = configStageOpcAddress?.value?.trim() ?? "";
-  config.stage.brightness = numberOrFallback(configStageBrightness?.value ?? "", config.stage.brightness ?? 0);
+  config.stage.brightness = readBrightnessControl(configStageBrightness, config.stage.brightness ?? 0);
   config.stage.side_lengths = readStageSideLengthGrid(config.stage.side_lengths ?? []);
   configEditor.value = JSON.stringify(config, null, 2);
   updateStructuredConfigFields(config);
@@ -8115,7 +8130,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, previewDrawer, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, previewDrawer, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
 var init_main = __esm({
   async "domers/ui/main.mjs"() {
     "use strict";
@@ -8148,16 +8163,19 @@ var init_main = __esm({
     configDomeEnabled = document.querySelector("#config-dome-enabled");
     configDomeSimulationEnabled = document.querySelector("#config-dome-simulation-enabled");
     configDomeOpcAddress = document.querySelector("#config-dome-opc-address");
+    configDomeBrightnessSlider = document.querySelector("#config-dome-brightness-slider");
     configDomeBrightness = document.querySelector("#config-dome-brightness");
     configBarEnabled = document.querySelector("#config-bar-enabled");
     configBarSimulationEnabled = document.querySelector("#config-bar-simulation-enabled");
     configBarInfinityLength = document.querySelector("#config-bar-infinity-length");
     configBarInfinityWidth = document.querySelector("#config-bar-infinity-width");
     configBarRunnerLength = document.querySelector("#config-bar-runner-length");
+    configBarBrightnessSlider = document.querySelector("#config-bar-brightness-slider");
     configBarBrightness = document.querySelector("#config-bar-brightness");
     configStageEnabled = document.querySelector("#config-stage-enabled");
     configStageSimulationEnabled = document.querySelector("#config-stage-simulation-enabled");
     configStageOpcAddress = document.querySelector("#config-stage-opc-address");
+    configStageBrightnessSlider = document.querySelector("#config-stage-brightness-slider");
     configStageBrightness = document.querySelector("#config-stage-brightness");
     configStageSideLengths = document.querySelector("#config-stage-side-lengths");
     configStageSideLengthsSummary = document.querySelector("#config-stage-side-lengths-summary");
@@ -8211,6 +8229,9 @@ var init_main = __esm({
       updateSnapshot(await request("/api/stop", { method: "POST" }));
     });
     document.querySelector("#reload-config")?.addEventListener("click", loadFullConfig);
+    bindBrightnessControls(configDomeBrightnessSlider, configDomeBrightness);
+    bindBrightnessControls(configBarBrightnessSlider, configBarBrightness);
+    bindBrightnessControls(configStageBrightnessSlider, configStageBrightness);
     document.querySelector("#apply-config")?.addEventListener("click", async () => {
       await applyFullConfig();
       await refreshPreviewFrame();
@@ -8424,7 +8445,10 @@ function ConfigEditor() {
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Brightness" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-brightness", name: "configDomeBrightness", type: "number", min: "0", max: "1", step: "0.01" })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "slider-number-field", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-brightness-slider", name: "configDomeBrightnessSlider", type: "range", min: "0", max: "1", step: "0.01" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-brightness", name: "configDomeBrightness", type: "number", min: "0", max: "1", step: "0.01" })
+            ] })
           ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "Bar output config", children: [
@@ -8453,7 +8477,10 @@ function ConfigEditor() {
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Brightness" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-brightness", name: "configBarBrightness", type: "number", min: "0", max: "1", step: "0.01" })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "slider-number-field", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-brightness-slider", name: "configBarBrightnessSlider", type: "range", min: "0", max: "1", step: "0.01" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-brightness", name: "configBarBrightness", type: "number", min: "0", max: "1", step: "0.01" })
+            ] })
           ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "Stage output config", children: [
@@ -8472,8 +8499,15 @@ function ConfigEditor() {
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Brightness" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-brightness", name: "configStageBrightness", type: "number", min: "0", max: "1", step: "0.01" })
-          ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "slider-number-field", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-brightness-slider", name: "configStageBrightnessSlider", type: "range", min: "0", max: "1", step: "0.01" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-brightness", name: "configStageBrightness", type: "number", min: "0", max: "1", step: "0.01" })
+            ] })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card stage-layout-card", "aria-label": "Stage layout config", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Stage Layout" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "field-hint", children: "These side lengths belong to the stage. They are physical layout values, not dome settings." }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "config-field stage-side-lengths-editor", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Side lengths" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "One numeric input per stage side. Values update the full config JSON when you apply structured config." }),

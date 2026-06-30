@@ -27,16 +27,19 @@ const configMidiBindings = document.querySelector('#config-midi-bindings');
 const configDomeEnabled = document.querySelector('#config-dome-enabled');
 const configDomeSimulationEnabled = document.querySelector('#config-dome-simulation-enabled');
 const configDomeOpcAddress = document.querySelector('#config-dome-opc-address');
+const configDomeBrightnessSlider = document.querySelector('#config-dome-brightness-slider');
 const configDomeBrightness = document.querySelector('#config-dome-brightness');
 const configBarEnabled = document.querySelector('#config-bar-enabled');
 const configBarSimulationEnabled = document.querySelector('#config-bar-simulation-enabled');
 const configBarInfinityLength = document.querySelector('#config-bar-infinity-length');
 const configBarInfinityWidth = document.querySelector('#config-bar-infinity-width');
 const configBarRunnerLength = document.querySelector('#config-bar-runner-length');
+const configBarBrightnessSlider = document.querySelector('#config-bar-brightness-slider');
 const configBarBrightness = document.querySelector('#config-bar-brightness');
 const configStageEnabled = document.querySelector('#config-stage-enabled');
 const configStageSimulationEnabled = document.querySelector('#config-stage-simulation-enabled');
 const configStageOpcAddress = document.querySelector('#config-stage-opc-address');
+const configStageBrightnessSlider = document.querySelector('#config-stage-brightness-slider');
 const configStageBrightness = document.querySelector('#config-stage-brightness');
 const configStageSideLengths = document.querySelector('#config-stage-side-lengths');
 const configStageSideLengthsSummary = document.querySelector('#config-stage-side-lengths-summary');
@@ -176,9 +179,7 @@ function updateStructuredConfigFields(config) {
   if (configDomeOpcAddress) {
     configDomeOpcAddress.value = config.dome?.opc_address ?? '';
   }
-  if (configDomeBrightness) {
-    configDomeBrightness.value = config.dome?.brightness ?? '';
-  }
+  setBrightnessControls(configDomeBrightnessSlider, configDomeBrightness, config.dome?.brightness);
   if (configBarEnabled) {
     configBarEnabled.checked = Boolean(config.bar?.enabled);
   }
@@ -194,9 +195,7 @@ function updateStructuredConfigFields(config) {
   if (configBarRunnerLength) {
     configBarRunnerLength.value = config.bar?.runner_length ?? '';
   }
-  if (configBarBrightness) {
-    configBarBrightness.value = config.bar?.brightness ?? '';
-  }
+  setBrightnessControls(configBarBrightnessSlider, configBarBrightness, config.bar?.brightness);
   if (configStageEnabled) {
     configStageEnabled.checked = Boolean(config.stage?.enabled);
   }
@@ -206,9 +205,7 @@ function updateStructuredConfigFields(config) {
   if (configStageOpcAddress) {
     configStageOpcAddress.value = config.stage?.opc_address ?? '';
   }
-  if (configStageBrightness) {
-    configStageBrightness.value = config.stage?.brightness ?? '';
-  }
+  setBrightnessControls(configStageBrightnessSlider, configStageBrightness, config.stage?.brightness);
   if (configStageSideLengths) {
     configStageSideLengths.value = (config.stage?.side_lengths ?? []).join(', ');
   }
@@ -243,6 +240,30 @@ function numberOrFallback(value, fallback) {
 function integerOrFallback(value, fallback) {
   const parsed = numberOrFallback(value, fallback);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function setBrightnessControls(slider, numberInput, value) {
+  const normalized = Number.isFinite(Number(value)) ? String(Number(value)) : '';
+  if (slider) {
+    slider.value = normalized || '0';
+  }
+  if (numberInput) {
+    numberInput.value = normalized;
+  }
+}
+
+function readBrightnessControl(numberInput, fallback) {
+  return Math.min(1, Math.max(0, numberOrFallback(numberInput?.value ?? '', fallback)));
+}
+
+function bindBrightnessControls(slider, numberInput) {
+  const sync = (source, target) => {
+    if (source && target) {
+      target.value = source.value;
+    }
+  };
+  slider?.addEventListener('input', () => sync(slider, numberInput));
+  numberInput?.addEventListener('input', () => sync(numberInput, slider));
 }
 
 function parseIntegerList(value, fallback) {
@@ -349,17 +370,17 @@ function updateConfigFromStructuredFields() {
   config.dome.enabled = Boolean(configDomeEnabled?.checked);
   config.dome.simulation_enabled = Boolean(configDomeSimulationEnabled?.checked);
   config.dome.opc_address = configDomeOpcAddress?.value?.trim() ?? '';
-  config.dome.brightness = numberOrFallback(configDomeBrightness?.value ?? '', config.dome.brightness ?? 0);
+  config.dome.brightness = readBrightnessControl(configDomeBrightness, config.dome.brightness ?? 0);
   config.bar.enabled = Boolean(configBarEnabled?.checked);
   config.bar.simulation_enabled = Boolean(configBarSimulationEnabled?.checked);
   config.bar.infinity_length = integerOrFallback(configBarInfinityLength?.value ?? '', config.bar.infinity_length ?? 0);
   config.bar.infinity_width = integerOrFallback(configBarInfinityWidth?.value ?? '', config.bar.infinity_width ?? 0);
   config.bar.runner_length = integerOrFallback(configBarRunnerLength?.value ?? '', config.bar.runner_length ?? 0);
-  config.bar.brightness = numberOrFallback(configBarBrightness?.value ?? '', config.bar.brightness ?? 0);
+  config.bar.brightness = readBrightnessControl(configBarBrightness, config.bar.brightness ?? 0);
   config.stage.enabled = Boolean(configStageEnabled?.checked);
   config.stage.simulation_enabled = Boolean(configStageSimulationEnabled?.checked);
   config.stage.opc_address = configStageOpcAddress?.value?.trim() ?? '';
-  config.stage.brightness = numberOrFallback(configStageBrightness?.value ?? '', config.stage.brightness ?? 0);
+  config.stage.brightness = readBrightnessControl(configStageBrightness, config.stage.brightness ?? 0);
   config.stage.side_lengths = readStageSideLengthGrid(config.stage.side_lengths ?? []);
   configEditor.value = JSON.stringify(config, null, 2);
   updateStructuredConfigFields(config);
@@ -1007,6 +1028,10 @@ document.querySelector('#stop-engine')?.addEventListener('click', async () => {
 });
 
 document.querySelector('#reload-config')?.addEventListener('click', loadFullConfig);
+
+bindBrightnessControls(configDomeBrightnessSlider, configDomeBrightness);
+bindBrightnessControls(configBarBrightnessSlider, configBarBrightness);
+bindBrightnessControls(configStageBrightnessSlider, configStageBrightness);
 
 document.querySelector('#apply-config')?.addEventListener('click', async () => {
   await applyFullConfig();
