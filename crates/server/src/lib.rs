@@ -177,7 +177,7 @@ impl Default for SimulatorControls {
         Self {
             volume: 0.7,
             beat_progress: 0.25,
-            flash_active: true,
+            flash_active: false,
         }
     }
 }
@@ -220,7 +220,7 @@ impl ServerState {
             simulator: SimulatorControls {
                 volume: 0.7,
                 beat_progress: 0.25,
-                flash_active: true,
+                flash_active: false,
             },
             inputs: InputRuntime::default(),
             metrics: Metrics {
@@ -405,9 +405,13 @@ impl ServerState {
         let mut controls = self.simulator;
         if let Some(volume) = self.inputs.volume {
             controls.volume = volume;
+        } else if self.running {
+            controls.volume = animated_volume(self.now_ms());
         }
         if self.inputs.beat.beat_ms().is_some() {
             controls.beat_progress = self.inputs.beat.progress(self.now_ms(), 1.0);
+        } else if self.running {
+            controls.beat_progress = animated_beat_progress(self.now_ms());
         }
         controls
     }
@@ -1280,6 +1284,19 @@ fn stage_side_lengths(config: &DomersConfig) -> Vec<usize> {
         .collect()
 }
 
+fn animated_beat_progress(now_ms: u64) -> f64 {
+    f64::from((now_ms % 1_000) as u32) / 1_000.0
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "No-input simulator fallback is clamped before converting to visualizer f32 input"
+)]
+fn animated_volume(now_ms: u64) -> f32 {
+    let phase = animated_beat_progress(now_ms) * std::f64::consts::TAU;
+    ((phase.sin() + 1.0) * 0.35 + 0.25).clamp(0.0, 1.0) as f32
+}
+
 const fn visualizer_from_index(index: u8) -> LiveVisualizer {
     match index {
         1 => LiveVisualizer::Radial,
@@ -1345,7 +1362,12 @@ mod tests {
         config.bar.test_pattern = 1;
         config.stage.simulation_enabled = true;
         config.stage.side_lengths = vec![3, 4, 5];
-        let state = ServerState::new(config);
+        let mut state = ServerState::new(config);
+        state.patch_simulator_controls(super::SimulatorControlsPatch {
+            volume: None,
+            beat_progress: None,
+            flash_active: Some(true),
+        });
 
         let frame = state.operator_frame();
 
@@ -1363,6 +1385,25 @@ mod tests {
         assert!(!frame.dome.is_empty());
         assert!(!frame.bar.is_empty());
         assert!(!frame.stage.is_empty());
+    }
+
+    #[test]
+    fn started_runtime_animates_visualizer_inputs_without_live_sources() {
+        let mut state = ServerState::default();
+        state.patch_dome_config(super::DomeConfigPatch {
+            active_visualizer: Some(1),
+            flash_speed: None,
+            color_palette_index: None,
+        });
+        state.start();
+        state.engine_frame();
+        let first = state.operator_frame().dome;
+        for _ in 0..100 {
+            state.engine_frame();
+        }
+        let second = state.operator_frame().dome;
+
+        assert_ne!(first, second);
     }
 
     #[test]
