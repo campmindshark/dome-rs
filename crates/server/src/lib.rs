@@ -409,7 +409,11 @@ impl ServerState {
     /// Produce one scheduled operator frame for all outputs.
     #[must_use]
     pub fn operator_frame(&self) -> OperatorCommandFrame {
-        render_operator_frame(&self.config, self.visualizer_controls())
+        render_operator_frame(
+            &self.config,
+            self.visualizer_controls(),
+            self.metrics.frames,
+        )
     }
 
     /// Return a serializable snapshot.
@@ -1081,6 +1085,7 @@ fn serialize_commands(commands: Vec<DomeCommand>) -> Vec<SimulatorCommand> {
 fn render_operator_frame(
     config: &DomersConfig,
     simulator: SimulatorControls,
+    frame_index: u64,
 ) -> OperatorCommandFrame {
     let engine = EngineConfig::from(config);
     let inputs = input_specs(simulator);
@@ -1088,8 +1093,8 @@ fn render_operator_frame(
     let schedule = schedule_operator_frame(&inputs, &outputs);
     let visualizer_input = simulator.visualizer_input(&engine);
     let diagnostic_input = DiagnosticInput {
-        state: 1,
-        step: 0,
+        state: diagnostic_state(frame_index),
+        step: diagnostic_step(frame_index),
         brightness: brightness_f32(config.dome.brightness),
         volume: simulator.volume,
         beat_progress: simulator.beat_progress,
@@ -1113,6 +1118,22 @@ fn render_operator_frame(
     }
 
     frame
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Diagnostic state intentionally wraps to a three-state animation cycle"
+)]
+fn diagnostic_state(frame_index: u64) -> u8 {
+    ((frame_index / 20) % 3) as u8
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Diagnostic step intentionally wraps to the displayable fixture range"
+)]
+fn diagnostic_step(frame_index: u64) -> usize {
+    (frame_index / 4) as usize
 }
 
 #[allow(
@@ -1540,6 +1561,21 @@ mod tests {
         assert!(frame
             .active_visualizers
             .contains(&"LEDStageFlashColorsDiagnosticVisualizer"));
+    }
+
+    #[test]
+    fn support_diagnostics_animate_with_runtime_frames() {
+        let mut config = DomersConfig::default();
+        config.dome.test_pattern = 2;
+        let mut state = ServerState::new(config);
+
+        let first = state.operator_frame().dome;
+        for _ in 0..12 {
+            state.engine_frame();
+        }
+        let second = state.operator_frame().dome;
+
+        assert_ne!(first, second);
     }
 
     #[test]
