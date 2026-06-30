@@ -137,9 +137,11 @@ impl ColorPalette {
 
 impl Default for ColorPalette {
     fn default() -> Self {
-        Self {
-            colors: vec![PaletteEntry::default(); Self::ENTRY_COUNT],
-        }
+        let mut colors = vec![PaletteEntry::default(); Self::ENTRY_COUNT];
+        colors[0] = PaletteEntry::solid(0x00_ff_00);
+        colors[1] = PaletteEntry::solid(0x00_80_ff);
+        colors[2] = PaletteEntry::solid(0xff_40_80);
+        Self { colors }
     }
 }
 

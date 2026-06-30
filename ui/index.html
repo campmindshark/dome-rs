@@ -84,10 +84,27 @@
             <option value="7">Palette 8</option>
           </select>
         </label>
+        <fieldset>
+          <legend>Runtime palette colors</legend>
+          <div class="swatches">
+            <label>
+              Color 1
+              <input id="palette-primary" name="palettePrimary" type="color" value="#00ff00" />
+            </label>
+            <label>
+              Color 2
+              <input id="palette-secondary" name="paletteSecondary" type="color" value="#0080ff" />
+            </label>
+            <label>
+              Color 3 / flash
+              <input id="palette-accent" name="paletteAccent" type="color" value="#ff4080" />
+            </label>
+          </div>
+        </fieldset>
       </section>
       <section aria-label="Simulator Preview Inputs">
         <h2>Simulator Preview Inputs</h2>
-        <p>These inputs fake live audio, beat, and palette colors until the matching runtime sources are connected.</p>
+        <p>These inputs fake live audio and beat state until the matching runtime sources are connected.</p>
         <label>
           Audio volume preview
           <input id="sim-volume" name="simVolume" type="range" min="0" max="1" step="0.01" value="0.7" />
@@ -102,23 +119,6 @@
           <input id="sim-flash-active" name="simFlashActive" type="checkbox" checked />
           Flash overlay active preview
         </label>
-        <fieldset>
-          <legend>Palette colors</legend>
-          <div class="swatches">
-            <label>
-              Primary
-              <input id="palette-primary" name="palettePrimary" type="color" value="#00ff00" />
-            </label>
-            <label>
-              Secondary
-              <input id="palette-secondary" name="paletteSecondary" type="color" value="#0080ff" />
-            </label>
-            <label>
-              Accent / flash
-              <input id="palette-accent" name="paletteAccent" type="color" value="#ff4080" />
-            </label>
-          </div>
-        </fieldset>
       </section>
       <section aria-label="Metrics">
         <p>Engine frames: <span id="metric-frames" class="metric">0</span></p>

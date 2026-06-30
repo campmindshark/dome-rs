@@ -56,9 +56,9 @@ function updateSnapshot(snapshot) {
   simBeatProgress.value = String(snapshot.simulator.beat_progress);
   simBeatProgressValue.textContent = String(snapshot.simulator.beat_progress);
   simFlashActive.checked = snapshot.simulator.flash_active;
-  palettePrimary.value = toColorInput(snapshot.simulator.primary);
-  paletteSecondary.value = toColorInput(snapshot.simulator.secondary);
-  paletteAccent.value = toColorInput(snapshot.simulator.accent);
+  palettePrimary.value = toColorInput(paletteColor(snapshot, 0));
+  paletteSecondary.value = toColorInput(paletteColor(snapshot, 1));
+  paletteAccent.value = toColorInput(paletteColor(snapshot, 2));
 }
 
 function toColorInput(color) {
@@ -67,6 +67,11 @@ function toColorInput(color) {
 
 function fromColorInput(color) {
   return Number.parseInt(color.replace('#', ''), 16);
+}
+
+function paletteColor(snapshot, relativeIndex) {
+  const absoluteIndex = snapshot.config.color_palette_index * 8 + relativeIndex;
+  return snapshot.config.color_palette.colors[absoluteIndex]?.color1 ?? 0;
 }
 
 function clearCanvas() {
@@ -228,9 +233,6 @@ async function patchSimulatorControls() {
       volume: Number(simVolume.value),
       beat_progress: Number(simBeatProgress.value),
       flash_active: simFlashActive.checked,
-      primary: fromColorInput(palettePrimary.value),
-      secondary: fromColorInput(paletteSecondary.value),
-      accent: fromColorInput(paletteAccent.value),
     }),
   });
   updateSnapshot(snapshot);
@@ -244,6 +246,19 @@ async function patchRuntimeControls() {
       active_visualizer: Number(activeVisualizer.value),
       flash_speed: Number(flashSpeed.value),
       color_palette_index: Number(paletteIndex.value),
+    }),
+  });
+  updateSnapshot(snapshot);
+  handleSimulatorFrame(await request('/api/simulator/frame'));
+}
+
+async function patchPaletteColor(relativeIndex, colorInput) {
+  const snapshot = await request('/api/config/palette', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      relative_index: relativeIndex,
+      color1: fromColorInput(colorInput.value),
+      color2_enabled: false,
     }),
   });
   updateSnapshot(snapshot);
@@ -284,13 +299,20 @@ for (const input of [activeVisualizer, flashSpeed, paletteIndex]) {
   });
 }
 
+for (const [relativeIndex, input] of [
+  [0, palettePrimary],
+  [1, paletteSecondary],
+  [2, paletteAccent],
+]) {
+  input?.addEventListener('input', async () => {
+    await patchPaletteColor(relativeIndex, input);
+  });
+}
+
 for (const input of [
   simVolume,
   simBeatProgress,
   simFlashActive,
-  palettePrimary,
-  paletteSecondary,
-  paletteAccent,
 ]) {
   input?.addEventListener('input', async () => {
     simVolumeValue.textContent = simVolume.value;

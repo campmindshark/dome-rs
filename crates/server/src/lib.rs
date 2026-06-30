@@ -12,7 +12,7 @@ use axum::{
     routing::{get, patch, post},
     Json, Router,
 };
-use domers_core::{EngineConfig, Rgb};
+use domers_core::{ColorPalette, EngineConfig, PaletteEntry};
 use domers_outputs::DomeCommand;
 use domers_visualizers::{render_dome_visualizer, LiveVisualizer, VisualizerInput};
 use serde::{Deserialize, Serialize};
@@ -97,12 +97,6 @@ pub struct SimulatorControls {
     pub beat_progress: f64,
     /// Whether the flash overlay is active.
     pub flash_active: bool,
-    /// Primary palette color encoded as `0xRRGGBB`.
-    pub primary: u32,
-    /// Secondary palette color encoded as `0xRRGGBB`.
-    pub secondary: u32,
-    /// Accent palette color encoded as `0xRRGGBB`.
-    pub accent: u32,
 }
 
 impl Default for SimulatorControls {
@@ -111,22 +105,25 @@ impl Default for SimulatorControls {
             volume: 0.7,
             beat_progress: 0.25,
             flash_active: true,
-            primary: 0x00_ff_00,
-            secondary: 0x00_80_ff,
-            accent: 0xff_40_80,
         }
     }
 }
 
 impl SimulatorControls {
-    fn visualizer_input(self) -> VisualizerInput {
+    fn visualizer_input(self, config: &EngineConfig) -> VisualizerInput {
         VisualizerInput {
             volume: self.volume,
             beat_progress: self.beat_progress,
             flash_active: self.flash_active,
-            primary: Rgb::from_u24(self.primary),
-            secondary: Rgb::from_u24(self.secondary),
-            accent: Rgb::from_u24(self.accent),
+            primary: config
+                .color_palette
+                .single_color(0, config.color_palette_index),
+            secondary: config
+                .color_palette
+                .single_color(1, config.color_palette_index),
+            accent: config
+                .color_palette
+                .single_color(2, config.color_palette_index),
         }
     }
 }
@@ -150,9 +147,6 @@ impl ServerState {
                 volume: 0.7,
                 beat_progress: 0.25,
                 flash_active: true,
-                primary: 0x00_ff_00,
-                secondary: 0x00_80_ff,
-                accent: 0xff_40_80,
             },
             metrics: Metrics {
                 frames: 0,
@@ -181,6 +175,26 @@ impl ServerState {
         }
     }
 
+    /// Patch one runtime color palette entry.
+    pub fn patch_palette_entry(&mut self, patch: PaletteEntryPatch) {
+        let absolute_index = ColorPalette::absolute_index(
+            usize::from(patch.relative_index.min(7)),
+            self.config.color_palette_index,
+        );
+        if self.config.color_palette.colors.len() <= absolute_index {
+            self.config
+                .color_palette
+                .colors
+                .resize(absolute_index + 1, PaletteEntry::default());
+        }
+        self.config.color_palette.colors[absolute_index] = if patch.color2_enabled.unwrap_or(false)
+        {
+            PaletteEntry::gradient(patch.color1, patch.color2.unwrap_or(patch.color1))
+        } else {
+            PaletteEntry::solid(patch.color1)
+        };
+    }
+
     /// Patch simulator input controls.
     pub fn patch_simulator_controls(&mut self, patch: SimulatorControlsPatch) {
         if let Some(volume) = patch.volume {
@@ -191,15 +205,6 @@ impl ServerState {
         }
         if let Some(flash_active) = patch.flash_active {
             self.simulator.flash_active = flash_active;
-        }
-        if let Some(primary) = patch.primary {
-            self.simulator.primary = primary & 0x00ff_ffff;
-        }
-        if let Some(secondary) = patch.secondary {
-            self.simulator.secondary = secondary & 0x00ff_ffff;
-        }
-        if let Some(accent) = patch.accent {
-            self.simulator.accent = accent & 0x00ff_ffff;
         }
     }
 
@@ -244,7 +249,7 @@ impl ServerState {
             7 => LiveVisualizer::Splat,
             _ => LiveVisualizer::Volume,
         };
-        render_dome_visualizer(visualizer, self.simulator.visualizer_input())
+        render_dome_visualizer(visualizer, self.simulator.visualizer_input(&self.config))
     }
 
     /// Return a serializable snapshot.
@@ -295,6 +300,7 @@ impl AppRuntime {
             .route("/api/start", post(start_engine))
             .route("/api/stop", post(stop_engine))
             .route("/api/config/dome", patch(patch_dome_config))
+            .route("/api/config/palette", patch(patch_palette_entry))
             .route("/api/dome/geometry", get(dome_geometry))
             .route("/api/dome/mapping", get(dome_mapping))
             .route("/api/simulator", patch(patch_simulator_controls))
@@ -340,6 +346,11 @@ impl AppRuntime {
     /// Patch dome runtime configuration.
     pub async fn patch_dome_config(&self, patch: DomeConfigPatch) {
         self.state.lock().await.patch_dome_config(patch);
+    }
+
+    /// Patch one runtime color palette entry.
+    pub async fn patch_palette_entry(&self, patch: PaletteEntryPatch) {
+        self.state.lock().await.patch_palette_entry(patch);
     }
 
     /// Patch simulator input controls.
@@ -426,6 +437,19 @@ pub struct DomeConfigPatch {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
+/// Runtime color palette patch payload.
+pub struct PaletteEntryPatch {
+    /// Color index within the active palette bank.
+    pub relative_index: u8,
+    /// First color encoded as `0xRRGGBB`.
+    pub color1: u32,
+    /// Optional second color encoded as `0xRRGGBB`.
+    pub color2: Option<u32>,
+    /// Whether to enable gradient blending for this entry.
+    pub color2_enabled: Option<bool>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
 /// Simulator control patch payload.
 pub struct SimulatorControlsPatch {
     /// Normalized audio volume preview.
@@ -434,12 +458,6 @@ pub struct SimulatorControlsPatch {
     pub beat_progress: Option<f64>,
     /// Whether the flash overlay is active.
     pub flash_active: Option<bool>,
-    /// Primary palette color encoded as `0xRRGGBB`.
-    pub primary: Option<u32>,
-    /// Secondary palette color encoded as `0xRRGGBB`.
-    pub secondary: Option<u32>,
-    /// Accent palette color encoded as `0xRRGGBB`.
-    pub accent: Option<u32>,
 }
 
 async fn index_html() -> Html<&'static str> {
@@ -494,6 +512,14 @@ async fn patch_dome_config(
     Json(patch): Json<DomeConfigPatch>,
 ) -> Json<ServerSnapshot> {
     runtime.patch_dome_config(patch).await;
+    Json(runtime.snapshot().await)
+}
+
+async fn patch_palette_entry(
+    State(runtime): State<AppRuntime>,
+    Json(patch): Json<PaletteEntryPatch>,
+) -> Json<ServerSnapshot> {
+    runtime.patch_palette_entry(patch).await;
     Json(runtime.snapshot().await)
 }
 
@@ -557,7 +583,7 @@ mod tests {
         time::Duration,
     };
 
-    use domers_core::EngineConfig;
+    use domers_core::{EngineConfig, PaletteEntry};
     use domers_outputs::DomeCommand;
     use tokio::net::TcpListener;
     use tokio::time;
@@ -593,15 +619,12 @@ mod tests {
     }
 
     #[test]
-    fn patches_simulator_controls_and_palette() {
+    fn patches_simulator_controls() {
         let mut state = ServerState::default();
         state.patch_simulator_controls(super::SimulatorControlsPatch {
             volume: Some(0.25),
             beat_progress: Some(0.75),
             flash_active: Some(false),
-            primary: Some(0xff_00_00),
-            secondary: Some(0x00_ff_00),
-            accent: Some(0x00_00_ff),
         });
 
         let snapshot = state.snapshot();
@@ -609,9 +632,28 @@ mod tests {
         assert!((snapshot.simulator.volume - 0.25).abs() < f32::EPSILON);
         assert!((snapshot.simulator.beat_progress - 0.75).abs() < f64::EPSILON);
         assert!(!snapshot.simulator.flash_active);
-        assert_eq!(snapshot.simulator.primary, 0xff_00_00);
-        assert_eq!(snapshot.simulator.secondary, 0x00_ff_00);
-        assert_eq!(snapshot.simulator.accent, 0x00_00_ff);
+    }
+
+    #[test]
+    fn patches_runtime_palette_entry() {
+        let mut state = ServerState::default();
+        state.patch_dome_config(super::DomeConfigPatch {
+            active_visualizer: None,
+            flash_speed: None,
+            color_palette_index: Some(2),
+        });
+        state.patch_palette_entry(super::PaletteEntryPatch {
+            relative_index: 1,
+            color1: 0xaa_bb_cc,
+            color2: Some(0x11_22_33),
+            color2_enabled: Some(true),
+        });
+
+        let absolute_index = domers_core::ColorPalette::absolute_index(1, 2);
+        assert_eq!(
+            state.config().color_palette.colors[absolute_index],
+            PaletteEntry::gradient(0xaa_bb_cc, 0x11_22_33)
+        );
     }
 
     #[tokio::test]

@@ -6,6 +6,6 @@ pub mod config;
 pub mod migration;
 
 pub use beat::{BeatBroadcaster, BeatClock};
-pub use color::Rgb;
+pub use color::{ColorPalette, PaletteEntry, Rgb};
 pub use config::{import_spectrum_xml, DomersConfig, EngineConfig, ImportedConfig};
 pub use migration::{analyze_spectrum_xml, MigrationReport, WarningKind};
