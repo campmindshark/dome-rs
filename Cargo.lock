@@ -156,6 +156,9 @@ name = "domers-outputs"
 version = "0.1.0"
 dependencies = [
  "domers-core",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
