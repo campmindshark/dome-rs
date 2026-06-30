@@ -214,30 +214,6 @@ function InputsDrawer() {
       <p>
         BPM: <span id="tempo-bpm">[none]</span> Tap counter: <span id="tap-counter">Tap</span>
       </p>
-      <div className="status-grid">
-        <p className="target-status">
-          <strong>Audio</strong>
-          <span id="input-audio">disabled</span>
-        </p>
-        <p className="target-status">
-          <strong>MIDI</strong>
-          <span id="input-midi">disabled</span>
-        </p>
-        <p className="target-status">
-          <strong>Orientation</strong>
-          <span id="input-orientation">disabled</span>
-        </p>
-        <p className="target-status">
-          <strong>Madmom</strong>
-          <span id="input-madmom">disabled</span>
-        </p>
-      </div>
-      <section aria-label="Orientation Devices">
-        <h3>Orientation Devices</h3>
-        <ul id="orientation-devices" className="device-list">
-          <li>none</li>
-        </ul>
-      </section>
       <section aria-label="MIDI Log">
         <h3>MIDI Log</h3>
         <ol id="midi-log" className="device-list">
@@ -323,18 +299,48 @@ function PreviewDrawer() {
 
 function OpcTargetsFooter() {
   return (
-    <footer className="opc-targets-footer" aria-label="OPC Targets">
-      <h2>OPC Targets</h2>
-      <div className="status-grid">
-        <p className="target-status">
-          <strong>Dome / Bar</strong>
-          <span id="hardware-dome">no address configured</span>
-        </p>
-        <p className="target-status">
-          <strong>Stage</strong>
-          <span id="hardware-stage">no address configured</span>
-        </p>
-      </div>
+    <footer className="opc-targets-footer" aria-label="OPC Targets and Device Status">
+      <h2>Runtime Status</h2>
+      <section aria-label="OPC Targets">
+        <h3>OPC Targets</h3>
+        <div className="status-grid">
+          <p className="target-status">
+            <strong>Dome / Bar</strong>
+            <span id="hardware-dome">no address configured</span>
+          </p>
+          <p className="target-status">
+            <strong>Stage</strong>
+            <span id="hardware-stage">no address configured</span>
+          </p>
+        </div>
+      </section>
+      <section aria-label="Device Status">
+        <h3>Device Status</h3>
+        <div className="status-grid">
+          <p className="target-status">
+            <strong>Audio</strong>
+            <span id="input-audio">disabled</span>
+          </p>
+          <p className="target-status">
+            <strong>MIDI</strong>
+            <span id="input-midi">disabled</span>
+          </p>
+          <p className="target-status">
+            <strong>Orientation</strong>
+            <span id="input-orientation">disabled</span>
+          </p>
+          <p className="target-status">
+            <strong>Madmom</strong>
+            <span id="input-madmom">disabled</span>
+          </p>
+        </div>
+        <section aria-label="Orientation Devices">
+          <h4>Orientation Devices</h4>
+          <ul id="orientation-devices" className="device-list">
+            <li>none</li>
+          </ul>
+        </section>
+      </section>
     </footer>
   );
 }

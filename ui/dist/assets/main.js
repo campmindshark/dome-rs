@@ -8367,28 +8367,6 @@ function InputsDrawer() {
       " Tap counter: ",
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "tap-counter", children: "Tap" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "status-grid", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Audio" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-audio", children: "disabled" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "MIDI" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-midi", children: "disabled" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Orientation" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-orientation", children: "disabled" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Madmom" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-madmom", children: "disabled" })
-      ] })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Orientation Devices", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Orientation Devices" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { id: "orientation-devices", className: "device-list", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "none" }) })
-    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "MIDI Log", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "MIDI Log" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", { id: "midi-log", className: "device-list", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "none" }) })
@@ -8460,16 +8438,44 @@ function PreviewDrawer() {
   ] });
 }
 function OpcTargetsFooter() {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("footer", { className: "opc-targets-footer", "aria-label": "OPC Targets", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "OPC Targets" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "status-grid", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Dome / Bar" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "hardware-dome", children: "no address configured" })
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("footer", { className: "opc-targets-footer", "aria-label": "OPC Targets and Device Status", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Runtime Status" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "OPC Targets", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "OPC Targets" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "status-grid", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Dome / Bar" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "hardware-dome", children: "no address configured" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Stage" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "hardware-stage", children: "no address configured" })
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Device Status", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Device Status" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "status-grid", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Audio" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-audio", children: "disabled" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "MIDI" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-midi", children: "disabled" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Orientation" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-orientation", children: "disabled" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Madmom" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-madmom", children: "disabled" })
+        ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Stage" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "hardware-stage", children: "no address configured" })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Orientation Devices", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { children: "Orientation Devices" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { id: "orientation-devices", className: "device-list", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "none" }) })
       ] })
     ] })
   ] });
