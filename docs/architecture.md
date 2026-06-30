@@ -14,14 +14,66 @@
 
 ## Runtime Shape
 
-```text
-Browser UI -> Server contract -> Engine scheduler -> Inputs + Visualizers -> Outputs
-                                                        |                  |
-                                                        |                  +-> OPC hardware
-                                                        +--------------------> Simulator frames
+```mermaid
+flowchart LR
+  subgraph Browser["Browser surfaces"]
+    Control["Operator controls<br/>GET /"]
+    Preview["Live preview drawer<br/>runtime stream"]
+    Sandbox["Simulator page<br/>/simulator"]
+    Footer["Runtime Status footer"]
+  end
+
+  subgraph Server["domers-server"]
+    Api["HTTP + WebSocket API"]
+    State["ServerState<br/>config, metrics, inputs, hardware"]
+    Runtime["AppRuntime tasks"]
+  end
+
+  subgraph Inputs["Input adapters"]
+    Udp["UDP audio / MIDI / orientation"]
+    Native["CPAL / midir<br/>native-capture builds"]
+    Beat["Tap tempo<br/>Madmom<br/>Link / Carabiner"]
+  end
+
+  subgraph Frame["Frame pipeline"]
+    Snapshot["Frame snapshot<br/>config + drained inputs"]
+    Scheduler["Engine scheduler<br/>400 Hz compute cap"]
+    Viz["Visualizers + diagnostics<br/>dome / bar / stage"]
+    Commands["Output command frame"]
+  end
+
+  subgraph Outputs["Output sinks"]
+    Opc["OPC clients<br/>200 Hz send cap"]
+    Hardware["Dome / bar / stage controllers"]
+    Sim["Simulator frames<br/>WebSocket + request render"]
+  end
+
+  Control -->|"config patches, start / stop, tap"| Api
+  Sandbox -->|"request-local controls"| Api
+  Api --> State
+  State -->|"snapshots"| Api
+  Api -->|"state + status"| Control
+  Api -->|"runtime status"| Footer
+  Runtime --> State
+  Udp --> Runtime
+  Native --> Runtime
+  Beat --> Runtime
+  State --> Snapshot
+  Snapshot --> Scheduler
+  Scheduler --> Viz
+  Viz --> Commands
+  Commands --> Opc
+  Opc --> Hardware
+  Commands --> Sim
+  Sim --> Preview
+  Sim --> Sandbox
 ```
 
-The browser simulator is driven by engine frame data. It does not read back from OPC hardware sockets.
+The runtime has one authoritative state owner: `ServerState`. Browser actions and
+input adapters enter through explicit API/task paths, engine frames render from a
+snapshot, and output command frames fan out to OPC clients plus browser simulator
+views. Browser simulator views render intended engine output; they do not read
+back from OPC hardware sockets.
 
 ## Runtime Surface
 
@@ -74,11 +126,11 @@ Stress tests cover:
 
 ## Configuration
 
-`dome-rs` native configuration is TOML. Runtime code loads TOML, not XML. Legacy Spectrum XML is handled only by the import command documented in [`configuration.md`](configuration.md). The runtime expands the TOML color-palette banks and shared entries into Spectrum's 64 absolute palette slots before visualizers render.
+`dome-rs` native configuration is TOML. Runtime code loads TOML, not XML. Legacy Spectrum XML is handled by the import command documented in [`configuration.md`](configuration.md). The runtime expands the TOML color-palette banks and shared entries into Spectrum's 64 absolute palette slots before visualizers render.
 
 ## Simulator Preview
 
-The live control page keeps simulator work lazy. It fetches runtime state on load, then starts geometry/mapping requests, one preview frame request, and the simulator WebSocket only when the `Preview` drawer opens. The dedicated `/simulator` page starts the simulator immediately and uses request-local controls through `POST /api/simulator/sandbox-frame`, so changing that page does not change runtime config or hardware output.
+The live control page keeps simulator work lazy. It fetches runtime state on load, then starts geometry/mapping requests, one preview frame request, and the simulator WebSocket when the `Preview` drawer opens. The dedicated `/simulator` page starts the simulator immediately and uses request-local controls through `POST /api/simulator/sandbox-frame`, so changing that page does not change runtime config or hardware output.
 
 ## Beat And Input Runtime
 
