@@ -42,3 +42,31 @@ This document tracks live, support, and dead Spectrum behavior for the Rust rewr
 - Ties run together, which is how Flash overlays the active dome mode.
 - Priority `1000` diagnostics override normal modes.
 - Priority `-1` is supported as always-run, although current Spectrum visualizers do not use it.
+
+## Example Porting Entry Template
+
+```text
+Name:
+Source file:
+Classification: live | support | dead
+Inputs:
+Outputs:
+Config fields:
+Simulator proof:
+Hardware proof:
+Notes:
+```
+
+## TODO Images
+
+TODO: Add image of Spectrum UI visualizer selector.
+
+- Capture: old Spectrum UI/VJ HUD showing dome active visualizer choices.
+- Expected: labels align with `domeActiveVis` values 0-7.
+- Suggested file: `docs/images/inventory-spectrum-visualizer-selector.png`.
+
+TODO: Add image of diagnostic pattern selector.
+
+- Capture: old Spectrum diagnostic/test-pattern controls.
+- Expected: dome/bar/stage diagnostic patterns are visible.
+- Suggested file: `docs/images/inventory-spectrum-diagnostics.png`.

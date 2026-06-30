@@ -3,7 +3,14 @@ import { readFile } from 'node:fs/promises';
 const required = [
   '../README.md',
   '../docs/architecture.md',
+  '../docs/configuration.md',
+  '../docs/fixture-capture.md',
+  '../docs/hardware-mapping.md',
+  '../docs/hardware-readiness.md',
+  '../docs/images/.gitkeep',
+  '../docs/porting-inventory.md',
   '../docs/testing.md',
+  '../docs/ui-expectations.md',
   './index.html',
   './main.mjs',
 ];
