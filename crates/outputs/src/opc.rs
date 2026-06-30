@@ -41,6 +41,12 @@ impl PersistentChannel {
     pub fn encode_current(&self, channel: u8) -> Vec<u8> {
         encode_frame(channel, &self.current)
     }
+
+    /// Return the realized current frame.
+    #[must_use]
+    pub fn current_pixels(&self) -> &[Rgb] {
+        &self.current
+    }
 }
 
 /// Parsed OPC address in `host:port[:channel]` form.

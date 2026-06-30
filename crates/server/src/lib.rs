@@ -12,9 +12,12 @@ use axum::{
     routing::{get, patch, post},
     Json, Router,
 };
-use domers_core::{ColorPalette, DomersConfig, EngineConfig, PaletteEntry};
+use domers_core::{ColorPalette, DomersConfig, EngineConfig, PaletteEntry, Rgb};
 use domers_engine::{schedule_operator_frame, FullVisualizerSpec, InputSpec, OutputSpec};
-use domers_outputs::{BarCommand, DomeCommand, StageCommand};
+use domers_outputs::{
+    apply_bar_commands, apply_dome_commands, apply_stage_commands, BarCommand, DomeCommand,
+    OpcAddress, OpcClient, PersistentChannel, StageCommand,
+};
 use domers_visualizers::{
     render_bar_diagnostic, render_dome_diagnostic, render_dome_visualizer, render_stage_visualizer,
     BarDiagnosticVisualizer, DiagnosticInput, DomeDiagnosticVisualizer, LiveVisualizer,
@@ -60,6 +63,30 @@ pub struct ServerSnapshot {
     pub metrics: Metrics,
     /// Simulator input and palette controls.
     pub simulator: SimulatorControls,
+    /// Hardware output connection status.
+    pub hardware: HardwareStatus,
+}
+
+/// Hardware output status exposed through `/api/state`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct HardwareStatus {
+    /// Dome/bar OPC target status.
+    pub dome: HardwareTargetStatus,
+    /// Stage OPC target status.
+    pub stage: HardwareTargetStatus,
+}
+
+/// One hardware target status.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct HardwareTargetStatus {
+    /// Whether this target is enabled by config.
+    pub enabled: bool,
+    /// Last configured address.
+    pub address: Option<String>,
+    /// Whether a TCP client is currently connected.
+    pub connected: bool,
+    /// Last connection or write error, if any.
+    pub last_error: Option<String>,
 }
 
 /// Browser-facing simulator frame.
@@ -270,6 +297,10 @@ impl ServerState {
         self.operator_frame().dome
     }
 
+    fn record_simulator_frame(&mut self) {
+        self.metrics.simulator_frames = self.metrics.simulator_frames.saturating_add(1);
+    }
+
     /// Produce one scheduled operator frame for all outputs.
     #[must_use]
     pub fn operator_frame(&self) -> OperatorCommandFrame {
@@ -284,6 +315,7 @@ impl ServerState {
             config: EngineConfig::from(&self.config),
             metrics: self.metrics,
             simulator: self.simulator,
+            hardware: HardwareStatus::default(),
         }
     }
 }
@@ -292,6 +324,7 @@ impl ServerState {
 #[derive(Clone)]
 pub struct AppRuntime {
     state: Arc<Mutex<ServerState>>,
+    hardware: Arc<Mutex<HardwareOutputs>>,
     frames: broadcast::Sender<SimulatorFrame>,
     engine_task: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
@@ -309,6 +342,7 @@ impl AppRuntime {
         let (frames, _) = broadcast::channel(32);
         Self {
             state: Arc::new(Mutex::new(ServerState::new(config))),
+            hardware: Arc::new(Mutex::new(HardwareOutputs::default())),
             frames,
             engine_task: Arc::new(Mutex::new(None)),
         }
@@ -346,7 +380,9 @@ impl AppRuntime {
 
     /// Return a server snapshot.
     pub async fn snapshot(&self) -> ServerSnapshot {
-        self.state.lock().await.snapshot()
+        let mut snapshot = self.state.lock().await.snapshot();
+        snapshot.hardware = self.hardware.lock().await.status();
+        snapshot
     }
 
     /// Start the engine task if it is not already running.
@@ -422,32 +458,160 @@ impl AppRuntime {
             interval.tick().await;
             frame_count = frame_count.saturating_add(1);
 
-            let maybe_frame = {
+            let (config, operator_frame, maybe_frame) = {
                 let mut state = self.state.lock().await;
                 if !state.running() {
                     return;
                 }
+                state.engine_frame();
+                let config = state.full_config();
+                let operator_frame = state.operator_frame();
 
                 #[allow(
                     clippy::manual_is_multiple_of,
                     reason = "The is_multiple_of method is newer than the workspace MSRV"
                 )]
-                if frame_count % SIMULATOR_FRAME_STRIDE == 0 {
-                    let commands = state.simulator_frame();
+                let maybe_frame = if frame_count % SIMULATOR_FRAME_STRIDE == 0 {
+                    state.record_simulator_frame();
                     Some(SimulatorFrame {
                         metrics: state.metrics(),
-                        commands: serialize_commands(commands),
+                        commands: serialize_commands(operator_frame.dome.clone()),
                     })
                 } else {
-                    state.engine_frame();
                     None
-                }
+                };
+                (config, operator_frame, maybe_frame)
             };
+
+            #[allow(
+                clippy::manual_is_multiple_of,
+                reason = "The is_multiple_of method is newer than the workspace MSRV"
+            )]
+            if frame_count % 2 == 0 {
+                self.hardware
+                    .lock()
+                    .await
+                    .send_operator_frame(&config, &operator_frame)
+                    .await;
+            }
 
             if let Some(frame) = maybe_frame {
                 let _ = self.frames.send(frame);
             }
         }
+    }
+}
+
+#[derive(Debug, Default)]
+struct HardwareOutputs {
+    dome: HardwareTarget,
+    stage: HardwareTarget,
+    dome_channel: PersistentChannel,
+    stage_channel: PersistentChannel,
+}
+
+impl HardwareOutputs {
+    fn status(&self) -> HardwareStatus {
+        HardwareStatus {
+            dome: self.dome.status.clone(),
+            stage: self.stage.status.clone(),
+        }
+    }
+
+    async fn send_operator_frame(&mut self, config: &DomersConfig, frame: &OperatorCommandFrame) {
+        if config.dome.enabled {
+            apply_dome_commands(&mut self.dome_channel, &frame.dome);
+            if config.bar.enabled {
+                apply_bar_commands(
+                    &mut self.dome_channel,
+                    &frame.bar,
+                    config.bar.infinity_width as usize,
+                    config.bar.infinity_length as usize,
+                    config.bar.runner_length as usize,
+                );
+            }
+            self.dome
+                .send(
+                    config.dome.opc_address.clone(),
+                    self.dome_channel.current_pixels(),
+                )
+                .await;
+        } else {
+            self.dome.disable();
+        }
+
+        if config.stage.enabled {
+            let side_lengths: Vec<_> = config
+                .stage
+                .side_lengths
+                .iter()
+                .map(|length| *length as usize)
+                .collect();
+            apply_stage_commands(&mut self.stage_channel, &frame.stage, &side_lengths);
+            self.stage
+                .send(
+                    config.stage.opc_address.clone(),
+                    self.stage_channel.current_pixels(),
+                )
+                .await;
+        } else {
+            self.stage.disable();
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct HardwareTarget {
+    client: Option<OpcClient>,
+    status: HardwareTargetStatus,
+}
+
+impl HardwareTarget {
+    async fn send(&mut self, address: String, pixels: &[Rgb]) {
+        self.status.enabled = true;
+        if self.status.address.as_deref() != Some(address.as_str()) {
+            self.client = None;
+            self.status.address = Some(address.clone());
+        }
+
+        if self.client.is_none() {
+            match OpcAddress::parse(&address) {
+                Ok(parsed) => match OpcClient::connect(parsed).await {
+                    Ok(client) => {
+                        self.client = Some(client);
+                        self.status.connected = true;
+                        self.status.last_error = None;
+                    }
+                    Err(error) => {
+                        self.status.connected = false;
+                        self.status.last_error = Some(error.to_string());
+                        return;
+                    }
+                },
+                Err(error) => {
+                    self.status.connected = false;
+                    self.status.last_error = Some(error);
+                    return;
+                }
+            }
+        }
+
+        if let Some(client) = &mut self.client {
+            if let Err(error) = client.send_frame(pixels).await {
+                self.client = None;
+                self.status.connected = false;
+                self.status.last_error = Some(error.to_string());
+            } else {
+                self.status.connected = true;
+                self.status.last_error = None;
+            }
+        }
+    }
+
+    fn disable(&mut self) {
+        self.client = None;
+        self.status.enabled = false;
+        self.status.connected = false;
     }
 }
 
@@ -967,8 +1131,8 @@ mod tests {
 
     use domers_core::{DomersConfig, PaletteEntry};
     use domers_outputs::DomeCommand;
-    use tokio::net::TcpListener;
     use tokio::time;
+    use tokio::{io::AsyncReadExt, net::TcpListener};
 
     use super::{health, serve_listener, AppRuntime, ServerState, SimulatorCommand};
 
@@ -1158,6 +1322,47 @@ mod tests {
         assert_eq!(before.config, after.config);
         assert_eq!(before.simulator, after.simulator);
         assert_eq!(before.metrics, after.metrics);
+    }
+
+    #[tokio::test]
+    async fn hardware_outputs_send_mapped_dome_frame_to_loopback_opc() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener binds");
+        let addr = listener.local_addr().expect("listener has local addr");
+        let read = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.expect("accepts");
+            let mut header = [0_u8; 4];
+            stream.read_exact(&mut header).await.expect("reads header");
+            let length = u16::from_be_bytes([header[2], header[3]]) as usize;
+            let mut body = vec![0_u8; length];
+            stream.read_exact(&mut body).await.expect("reads body");
+            (header, body)
+        });
+        let mut config = DomersConfig::default();
+        config.dome.enabled = true;
+        config.dome.opc_address = format!("127.0.0.1:{}", addr.port());
+        let frame = super::OperatorCommandFrame {
+            dome: vec![
+                DomeCommand::Pixel {
+                    strut_index: 0,
+                    led_index: 0,
+                    color: domers_core::Rgb::from_u24(0xff_00_00),
+                },
+                DomeCommand::Flush,
+            ],
+            ..super::OperatorCommandFrame::default()
+        };
+        let mut hardware = super::HardwareOutputs::default();
+
+        hardware.send_operator_frame(&config, &frame).await;
+
+        let (header, body) = read.await.expect("read joins");
+        let device_index = 880;
+        let byte_index = device_index * 3;
+        assert_eq!(header[0], 0);
+        assert_eq!(&body[byte_index..byte_index + 3], &[0xff, 0, 0]);
+        assert!(hardware.status().dome.connected);
     }
 
     #[tokio::test]
