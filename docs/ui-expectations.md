@@ -1,6 +1,7 @@
 # UI Expectations
 
-This document records the browser UI states worth checking. Add screenshots when a state is stable enough for comparison.
+This document records the browser UI states covered by the built React app and
+`node ui/check.mjs`.
 
 ## Operator Shell
 
@@ -11,23 +12,18 @@ Expected elements:
 - `MindShark Dome Control Panel` heading
 - `Start` and `Stop` engine buttons
 - engine status text
-- `Config Editor` drawer with full native JSON config reload/apply controls plus card-based structured input, tempo, Madmom, output, and layout controls
-- floating runtime status footer showing dome/bar and stage OPC targets plus audio, MIDI, orientation, Madmom, and orientation-device status
+- `Config Editor` drawer with full native JSON config reload/apply controls plus card-based structured input, tempo, Madmom, output, brightness, and stage-layout controls
+- fixed runtime status footer showing dome/bar and stage OPC targets plus audio, MIDI, MIDI level-driver, orientation, Madmom, Link, and orientation-device status
 - WebSocket stream status text
 - `domeActiveVis` selector with Volume, Radial, Race, Snakes, Quaternion Test, Quaternion Multi Test, Quaternion Paintbrush, Splat, and TV Static
 - `flashSpeed` slider
 - closed `Palettes` drawer with the active palette selector
 - opening `Palettes` shows all eight palette slots at once, each with eight editable entries, `color1`, `color2`, and gradient enablement
-- closed `Inputs` drawer with tap tempo, orientation calibration, audio/MIDI/orientation/Madmom adapter status, active orientation devices, and MIDI log
+- closed `Inputs` drawer with tap tempo, reset tempo, orientation calibration, and MIDI log
 - closed `Debug Visuals` drawer with selectors for dome, bar, and stage test patterns
 - closed `Preview` drawer
 - link from the preview drawer to `/simulator`
-
-TODO: Add image of the operator shell.
-
-- Capture: browser window at desktop size.
-- Expected: runtime controls are visible and the `Preview` drawer is closed.
-- Suggested file: `docs/images/ui-operator-shell.png`.
+- responsive mobile layout that stacks dense cards and keeps header/footer controls usable on narrow screens
 
 ## Running Engine State
 
@@ -40,12 +36,6 @@ Expected behavior after clicking `Start`:
 - opening the `Preview` drawer connects the simulator stream and shows runtime frame data
 - closing the drawer stops requesting browser preview frames
 
-TODO: Add image of running state.
-
-- Capture: after clicking `Start`.
-- Expected: status reads `running`.
-- Suggested file: `docs/images/ui-running-state.png`.
-
 ## Dome Visualizer Selection
 
 Expected behavior when selecting each dome visualizer:
@@ -56,13 +46,7 @@ Expected behavior when selecting each dome visualizer:
 - Debug Visuals selectors patch test-pattern fields through `/api/config/diagnostics`
 - dome debug visuals override the active dome visualizer until switched back to `Off`
 - simulator frame stream updates after the selection is applied
-- invalid values are currently clamped server-side; tighter validation belongs with the config editor work
-
-TODO: Add image sequence of the visualizer selector.
-
-- Capture: dropdown open and at least one selected non-default mode.
-- Expected: labels match the Spectrum active visualizer map.
-- Suggested file: `docs/images/ui-dome-visualizer-selector.png`.
+- invalid values are clamped server-side
 
 ## Simulator Frame View
 
@@ -80,22 +64,3 @@ Expected simulator behavior:
 - display color compensation is applied only to the UI view, never to OPC bytes
 - preview drawer shows frame metrics, stream status, and `dome-simulator` without simulator-only controls
 - live preview and `/simulator` expose bar and stage command previews beside the dome canvas
-
-TODO: Add image of a non-empty dome simulator frame.
-
-- Capture: canvas after a deterministic simulator frame is rendered.
-- Expected: visible colored points/struts, with the selected visualizer noted in the caption.
-- Suggested file: `docs/images/ui-dome-simulator-frame.png`.
-
-## Control Backlog
-
-These controls are not cuts. They need API state, UI binding, simulator evidence, and tests.
-
-- dome volume rotation speed
-- dome gradient speed
-- dome global fade speed
-- dome global hue speed
-- dome twinkle density
-- dome ripple controls
-- dome radial effect, size, frequency, center angle, and center distance
-- diagnostics panel

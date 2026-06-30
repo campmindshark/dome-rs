@@ -22,33 +22,15 @@ Hardware validation gates release tags. Complete this checklist after the automa
 - Run full-color flash diagnostic and verify brightness limits.
 - Confirm buffer-based simulator modes run without OPC enabled.
 
-TODO: Add image of expected dome full-color flash.
-
-- Capture: physical dome or simulator during full-color flash diagnostic.
-- Expected: all expected dome LEDs lit consistently.
-- Suggested file: `docs/images/readiness-dome-full-color-flash.png`.
-
 ## Bar
 
 - Verify bar pixels route through dome control box 5.
 - Run bar corner/runner diagnostic and verify reversal rules.
 
-TODO: Add image of expected bar diagnostic.
-
-- Capture: bar corner/runner diagnostic.
-- Expected: corners, runner, and reversal direction are identifiable.
-- Suggested file: `docs/images/readiness-bar-diagnostic.png`.
-
 ## Stage
 
 - Run stage side/layer diagnostic.
 - Verify all 48 sides and 3 layers match physical layout.
-
-TODO: Add image of expected stage side/layer diagnostic.
-
-- Capture: stage during side/layer diagnostic.
-- Expected: side index/layer mapping is clear.
-- Suggested file: `docs/images/readiness-stage-side-layer.png`.
 
 ## Inputs
 
@@ -58,24 +40,12 @@ TODO: Add image of expected stage side/layer diagnostic.
 - Verify orientation devices on UDP port 5005.
 - Verify the **Inputs** drawer shows audio, MIDI, orientation, and Madmom event counters increasing with no last error.
 
-TODO: Add image of expected input status panel.
-
-- Capture: UI/API output showing MIDI/audio/Madmom/orientation status.
-- Expected: each input source has a clear connected/active state before physical output is trusted.
-- Suggested file: `docs/images/readiness-input-status.png`.
-
 ## Network And Recovery
 
 - Verify OPC reconnect after controller restart or cable interruption.
-- Verify the controls page floating **OPC Targets** footer shows the expected addresses, `connected`, increasing frame counts, and no last error while output is running.
+- Verify the fixed **Runtime Status** footer shows the expected OPC addresses, `connected`, increasing frame counts, input event counters, and no last error while output is running.
 - Verify server start/stop from browser UI.
 - Verify simulator frame stream remains responsive during a 60-second run.
-
-TODO: Add image of expected server/recovery status.
-
-- Capture: UI/API output after reconnect test.
-- Expected: OPC reconnect is visible in status or logs.
-- Suggested file: `docs/images/readiness-opc-reconnect.png`.
 
 ## Sign-Off
 

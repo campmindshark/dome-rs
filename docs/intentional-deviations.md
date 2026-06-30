@@ -20,7 +20,7 @@ cargo run --bin domers-config -- import-spectrum-xml <spectrum.xml> <domers.toml
 
 **Spectrum:** The XML stores the palette as 64 absolute color entries: eight palette banks with eight slots each.
 
-**dome-rs:** Runtime still expands to the same 64 absolute slots, but TOML stores repeated colors once under `color_palette.entries` and references them from `color_palette.banks`. The old verbose `[[color_palette.colors]]` form still parses for compatibility.
+**dome-rs:** Runtime expands to the same 64 absolute slots, but TOML stores repeated colors once under `color_palette.entries` and references them from `color_palette.banks`. The old verbose `[[color_palette.colors]]` form parses for compatibility.
 
 **Reason:** The Spectrum XML contains duplicate palette entries. Shared TOML entries keep the checked config readable without changing runtime palette indexing.
 
@@ -64,7 +64,7 @@ cargo run --bin domers-config -- import-spectrum-xml <spectrum.xml> <domers.toml
 
 **Reason:** Snapshot-based rendering avoids torn config reads when browser controls, MIDI events, and visualizer rendering happen concurrently.
 
-**Validation:** Tests cover deterministic scheduler and server state behavior, including config patching during frame production, MIDI replay paths, and simulator frame generation. Remaining stress coverage belongs in longer soak/load tests.
+**Validation:** Tests cover deterministic scheduler and server state behavior, including config patching during frame production, MIDI replay paths, and simulator frame generation.
 
 ## Timing Targets Kept From Spectrum
 
@@ -75,4 +75,4 @@ cargo run --bin domers-config -- import-spectrum-xml <spectrum.xml> <domers.toml
 - `spectrum/Spectrum/Operator.cs` defines `MaxFramesPerSecond = 400` and comments that the operator loop runs no faster than 400 Hz.
 - `spectrum/LEDs/OPCAPI.cs` defines `MaxRefreshRateHz = 200` and comments that OPC wire rate is independent of engine compute.
 
-**Validation:** Scheduler tests are deterministic. Remaining timing coverage: fake-clock frame tests and measured soak tests for runtime limits.
+**Validation:** Scheduler tests cover frame selection and runtime tests cover engine frame cadence effects, simulator stride behavior, OPC send throttling, and wall-clock tap-tempo input timing.

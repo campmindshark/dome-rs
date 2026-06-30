@@ -7,7 +7,7 @@
 - Browser control page served by the Rust binary at `/`.
 - Dedicated simulator page served at `/simulator`.
 - Runtime controls for engine start/stop, active dome visualizer, flash speed, active palette slot, and full palette colors/gradients.
-- Inputs drawer for tap tempo plus audio, MIDI, orientation, Madmom, Link, and MIDI level-driver status.
+- Inputs drawer for tap tempo controls, MIDI log, and orientation calibration.
 - Debug Visuals drawer for dome, bar, and stage hardware-check patterns.
 - Live Preview drawer that mirrors the runtime frame stream used for hardware output.
 - Independent `/simulator` sandbox with local controls that do not change runtime config or hardware output.
@@ -49,7 +49,7 @@ Check config, bind address, OPC address syntax, and Madmom command availability 
 cargo run --bin domers -- doctor --config domers.toml --bind 127.0.0.1:3000
 ```
 
-Then start with the same config, click `Start`, and check the floating **OPC Targets** footer on the controls page. It shows each configured target address, enabled state, TCP connection state, successful frame count, and the last connection/write error.
+Then start with the same config, click `Start`, and check the fixed **Runtime Status** footer on the controls page. It shows each configured target address, enabled state, TCP connection state, successful frame count, input adapter status, MIDI level-driver values, orientation devices, and the last connection/write error.
 
 ## Configuration
 
@@ -118,11 +118,3 @@ node ui/check.mjs
 - [Hardware readiness](docs/hardware-readiness.md)
 - [Porting inventory](docs/porting-inventory.md)
 - [Intentional deviations from Spectrum](docs/intentional-deviations.md)
-
-## TODO Images
-
-TODO: Add image of the MindShark Dome Control Panel page here.
-
-- Capture: full browser window at desktop size.
-- Expected: title, start/stop buttons, floating OPC Targets footer, runtime controls, metrics, stream status, and a closed Preview drawer are visible.
-- Suggested file: `docs/images/readme-operator-shell.png`.

@@ -1,6 +1,7 @@
 # Fixture Capture
 
-M0 captures C# references before Rust behavior is trusted.
+Fixture capture keeps Spectrum-derived behavior reproducible without physical
+hardware.
 
 ## Capture Command
 
@@ -65,7 +66,7 @@ Generated fixture groups:
 - Orientation datagram examples.
 - Madmom stdout examples.
 
-Each fixture file must record source commit, command used to capture it, and whether hardware sign-off is still required.
+Each fixture file must record source commit, command used to capture it, and whether hardware sign-off is required.
 
 ## Example Fixture Use
 
@@ -74,17 +75,3 @@ let expected = include_bytes!("../../../fixtures/spectrum-csharp/opc_packets/two
 let encoded = encode_frame(2, &[Rgb::from_u24(0x123456), Rgb::from_u24(0xaabbcc)]);
 assert_eq!(encoded.as_slice(), expected);
 ```
-
-## TODO Images
-
-TODO: Add image of the fixture directory after extraction.
-
-- Capture: editor file tree or terminal `ls -R fixtures` output.
-- Expected: config, madmom, orientation, and spectrum-csharp fixture groups are visible.
-- Suggested file: `docs/images/fixtures-directory-tree.png`.
-
-TODO: Add image of source-to-fixture mapping.
-
-- Capture: side-by-side view of C# source constant and generated JSON fixture.
-- Expected: shows why the fixture is traceable back to Spectrum.
-- Suggested file: `docs/images/fixtures-source-to-json.png`.

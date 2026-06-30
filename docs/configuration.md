@@ -95,8 +95,8 @@ color2_enabled = true
 - `color1` and `color2` use Spectrum's `0xRRGGBB` integer convention.
 - `color2_enabled = false` makes the entry a solid `color1`.
 - `color2_enabled = true` enables Spectrum-compatible gradient blending.
-- Palette slot `N` still uses bank `N` with eight entries; repeated bank references intentionally share one entry definition.
-- The old verbose `[[color_palette.colors]]` 64-entry absolute form still parses for compatibility.
+- Palette slot `N` uses bank `N` with eight entries; repeated bank references intentionally share one entry definition.
+- The old verbose `[[color_palette.colors]]` 64-entry absolute form parses for compatibility.
 
 If `color_palette` is omitted, `dome-rs` creates a default 64-entry palette with visible starter colors in entries 0-2.
 
@@ -145,9 +145,10 @@ action = "adsr_level_driver"
 bind = "127.0.0.1:5005" # raw Spectrum orientation datagrams
 ```
 
-The controls page **Inputs** drawer shows each adapter target, accepted event
-count, latest value, and last error. It also shows recent MIDI commands/actions,
-active orientation devices, and an **Calibrate Orientation** control.
+The fixed **Runtime Status** footer shows each adapter target, accepted event
+count, latest value, MIDI level-driver values, active orientation devices, and
+last error. The **Inputs** drawer contains tap/reset tempo controls, recent MIDI
+commands/actions, and the **Calibrate Orientation** control.
 
 Supported MIDI binding actions are:
 
@@ -158,9 +159,9 @@ Supported MIDI binding actions are:
 - `visualizer`: set the active dome visualizer. Use `target_index` for a fixed visualizer or omit it to map command value across visualizers 0-8.
 - `adsr_level_driver`: treat `index` as the first note in an 8-note Spectrum ADSR range. Positive note velocity presses the channel; zero velocity releases it.
 
-UDP audio and MIDI remain useful bridge transports, but they are not the full
-native-device scope. macOS/Linux native audio and MIDI capture are parity work;
-device identity/index semantics are already represented in config and tests.
+UDP audio and MIDI remain useful bridge transports. macOS/Linux native audio and
+MIDI capture are available when the server is built with the `native-capture`
+feature; device identity/index semantics are represented in config and tests.
 
 Native capture is available in builds compiled with:
 
@@ -205,8 +206,9 @@ filter_range_end = 1.0
 0 = "full spectrum"
 ```
 
-Audio presets and channel assignments are preserved for native spectral capture;
-UDP volume samples remain a whole-signal fallback until native capture is enabled.
+Audio presets and channel assignments are preserved in config. MIDI ADSR presets
+drive runtime level-driver channels; UDP audio samples and native CPAL capture
+provide whole-signal volume input.
 
 ## Import Existing Spectrum XML
 
@@ -254,7 +256,12 @@ Run `domers doctor` before starting output:
 cargo run --bin domers -- doctor --config domers.toml --bind 127.0.0.1:3000
 ```
 
-After clicking `Start`, the controls page floating **OPC Targets** footer shows the configured addresses, whether each target is enabled, current TCP connection state, successful frame count, and the most recent connection/write error. A connected target with an increasing frame count means `dome-rs` is successfully writing OPC frames to that TCP endpoint; physical LED confirmation is still part of hardware sign-off.
+After clicking `Start`, the fixed **Runtime Status** footer shows the configured
+addresses, whether each target is enabled, current TCP connection state,
+successful frame count, and the most recent connection/write error. A connected
+target with an increasing frame count means `dome-rs` is successfully writing
+OPC frames to that TCP endpoint; physical LED confirmation is part of hardware
+sign-off.
 
 ## Madmom Config
 
@@ -341,17 +348,3 @@ tempo=120 phase=0.25
 `phase` is optional and normalized into `[0.0, 1.0)`.
 
 See [`intentional-deviations.md`](intentional-deviations.md) for the rationale.
-
-## TODO Images
-
-TODO: Add image of the config import command running successfully.
-
-- Capture: terminal after running `domers-config import-spectrum-xml`.
-- Expected: command exits successfully and prints migration warnings.
-- Suggested file: `docs/images/config-import-success.png`.
-
-TODO: Add image of an imported TOML config in the editor.
-
-- Capture: editor with `[dome]`, `[tempo]`, and `[madmom]` sections visible.
-- Expected: values are readable and no XML remains in the runtime config.
-- Suggested file: `docs/images/imported-domers-toml.png`.

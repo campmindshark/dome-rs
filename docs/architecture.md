@@ -7,9 +7,9 @@
 - `domers-core`: shared colors, Spectrum palette semantics, beat timing, config types, TOML config import, and migration warnings.
 - `domers-engine`: scheduler and frame orchestration.
 - `domers-outputs`: dome/bar/stage commands, topology, simulator sinks, and OPC encoding.
-- `domers-inputs`: Madmom protocol parsing and sidecar launch wrapper, MIDI replay, audio replay, and orientation datagram classification.
-- `domers-visualizers`: visualizer inventory and deterministic simulator frame harness.
-- `domers-server`: HTTP/WebSocket contract surface and state semantics.
+- `domers-inputs`: audio/MIDI payload parsing, Madmom and Link sidecar parsing, and orientation datagram classification.
+- `domers-visualizers`: visualizer inventory, dome/bar/stage renderers, diagnostics, and frame-hash harnesses.
+- `domers-server`: runtime state, HTTP/WebSocket API, input tasks, simulator frames, and hardware output.
 - `domers-test-support`: fake clocks and deterministic test utilities.
 
 ## Runtime Shape
@@ -82,22 +82,8 @@ The live control page keeps simulator work lazy. It fetches runtime state on loa
 
 ## Beat And Input Runtime
 
-The runtime accepts tap tempo, MIDI commands, audio volume samples, orientation datagrams, Madmom-compatible `BEAT:{seconds}` lines, and Link/Carabiner-compatible tempo lines through explicit input paths. `domers run` can start optional UDP adapters for audio, MIDI, and orientation. It manages the Madmom sidecar when `tempo.source = "madmom"` and the Link sidecar when `tempo.source = "link"`. The server exposes adapter targets, event counters, and last errors in `/api/state`; `POST /api/input/tap` records human tap tempo.
+The runtime accepts tap tempo, MIDI commands, audio volume samples, orientation datagrams, Madmom-compatible `BEAT:{seconds}` lines, and Link/Carabiner-compatible tempo lines through explicit input paths. `domers run` can start optional UDP adapters for audio, MIDI, and orientation, and optional native CPAL/midir capture in `native-capture` builds. It manages the Madmom sidecar when `tempo.source = "madmom"` and the Link sidecar when `tempo.source = "link"`. Human tap tempo uses wall-clock input time rather than engine frame time. The server exposes adapter targets, event counters, MIDI level-driver values, orientation devices, and last errors in `/api/state`.
 
 ## Intentional Deviations
 
 Spectrum compatibility decisions and explicit differences are tracked in [`intentional-deviations.md`](intentional-deviations.md). Keep this file focused on `dome-rs` architecture; put historical comparisons and deliberate departures there.
-
-## TODO Images
-
-TODO: Add architecture diagram image.
-
-- Capture: rendered diagram of browser UI, server, engine, inputs, visualizers, outputs, OPC, and simulator frame stream.
-- Expected: clearly shows simulator frames are separate from OPC hardware output.
-- Suggested file: `docs/images/architecture-runtime-flow.png`.
-
-TODO: Add screenshot of server metrics.
-
-- Capture: browser/devtool/API output showing frame counters and simulator frame counters.
-- Expected: `frames` and `simulator_frames` are visible.
-- Suggested file: `docs/images/architecture-server-metrics.png`.

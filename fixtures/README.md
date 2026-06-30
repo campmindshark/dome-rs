@@ -36,11 +36,3 @@ Read the legacy Spectrum config fixture for TOML import tests:
 ```rust
 let xml = include_str!("../../../fixtures/config/spectrum_default_config.xml");
 ```
-
-## TODO Images
-
-TODO: Add image of fixture regeneration output.
-
-- Capture: terminal after running `python3 tools/extract_spectrum_fixtures.py`.
-- Expected: fixture files are updated and git diff is understandable.
-- Suggested file: `docs/images/fixtures-regeneration-output.png`.

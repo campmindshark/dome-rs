@@ -7,7 +7,8 @@ Shared domain types for the `dome-rs` workspace.
 - Native `DomersConfig` and imported Spectrum XML configuration.
 - Engine-facing `EngineConfig` projection.
 - Spectrum-compatible color, palette, and gradient math.
-- Beat timing primitives for tap tempo, Madmom beats, BPM display, flash gates, and reset behavior.
+- Beat timing primitives for wall-clock tap tempo, Madmom beats, Link tempo, BPM display, flash gates, and reset behavior.
+- Spectrum-derived Carabiner, native input, and level-driver configuration.
 - Migration warnings for stale, inert, or invalid Spectrum config fields.
 
 ## Key Files

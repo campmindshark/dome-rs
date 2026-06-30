@@ -26,7 +26,7 @@ node ui/check.mjs
 - Madmom sidecar launch argument, disabled-lifecycle behavior, managed stdout ingestion path, derived audio input index, and fake-sidecar runtime test.
 - Spectrum-compatible 64-entry palette indexing and gradient blending.
 - Shared-entry palette TOML serialization, parsing, and XML import golden output.
-- Visualizer simulator-frame harness, local frame-hash snapshots for live dome modes, and headless Spectrum C# visualizer golden capture.
+- Visualizer simulator-frame harness, local frame-hash snapshots for live dome modes, captured headless Spectrum C# visualizer goldens, and manifest coverage that rejects missing visualizer hashes.
 - Server state contract for full config reload/apply, runtime config patching, palette patching, start/stop, metrics, input status, hardware status, and simulator frames.
 - HTTP adapter smoke coverage for UI, state, geometry, mapping, and start routes.
 - UI smoke markers for API/WebSocket wiring, pixel rendering, full palette controls, structured config controls, input status controls, and simulator controls.
@@ -75,7 +75,7 @@ solution's `Madmom/Madmom.pyproj` requires Visual Studio Python Tools.
 headlessly with simulation-only output, and `check_visualizer_goldens.py` ensures
 all captured hashes are present.
 
-Next additions: browser automation/screenshots, Docker Compose wrappers around the in-process OPC/input loopback tests, load tests, and physical hardware sign-off artifacts.
+Browser automation, load tests, and physical hardware sign-off artifacts are release evidence, not prerequisites for the no-hardware test suite.
 
 ## Manual Hardware Checklist
 
@@ -86,17 +86,3 @@ Use [`hardware-readiness.md`](hardware-readiness.md) for release sign-off.
 - Stage side/layer diagnostics.
 - OPC reconnect after interruption.
 - MIDI board, audio volume, Madmom beat tracking, tap tempo, and orientation paintbrush.
-
-## TODO Images
-
-TODO: Add image of a passing GitHub Actions run.
-
-- Capture: Actions page for `campmindshark/dome-rs` with `rust-fast`, `docs-and-ui-smoke`, and `docker-loopback-placeholder` green.
-- Expected: latest `main` run is green.
-- Suggested file: `docs/images/testing-github-actions-green.png`.
-
-TODO: Add image of local test output.
-
-- Capture: terminal after running the PR fast commands.
-- Expected: cargo tests, clippy, and UI smoke all pass.
-- Suggested file: `docs/images/testing-local-fast-gate.png`.

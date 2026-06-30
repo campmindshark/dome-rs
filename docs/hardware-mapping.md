@@ -32,23 +32,3 @@ That packet means:
 - RGB payload: `0x123456`, `0xaabbcc`
 
 Fixture captures must include every logical-to-device mapping used by dome, bar, and stage outputs.
-
-## TODO Images
-
-TODO: Add image of dome strut numbering/reference orientation.
-
-- Capture: dome simulator key mode or physical reference diagram.
-- Expected: strut indices are readable and orientation is noted as top-down.
-- Suggested file: `docs/images/hardware-dome-strut-key.png`.
-
-TODO: Add image of bar routing/control box reference.
-
-- Capture: bar diagram showing infinity strip, runner, and control box 5 routing.
-- Expected: direction/reversal is annotated.
-- Suggested file: `docs/images/hardware-bar-routing.png`.
-
-TODO: Add image of stage side/layer reference.
-
-- Capture: physical stage diagram or future stage simulator key.
-- Expected: 48 sides and 3 layers are visually identifiable.
-- Suggested file: `docs/images/hardware-stage-side-layer-key.png`.
