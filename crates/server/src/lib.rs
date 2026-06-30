@@ -19,9 +19,9 @@ use domers_core::{
 use domers_engine::{schedule_operator_frame, FullVisualizerSpec, InputSpec, OutputSpec};
 use domers_inputs::{
     capture_devices_from_all_endpoints, current_audio_device_index, parse_beat_line,
-    parse_midi_payload, parse_volume_payload, AudioDeviceFlow, EnumeratedAudioEndpoint,
-    MadmomLaunchConfig, MidiCommand, MidiCommandKind, OrientationDevice, OrientationInputState,
-    OrientationQuaternion,
+    parse_link_tempo_line, parse_midi_payload, parse_volume_payload, AudioDeviceFlow,
+    EnumeratedAudioEndpoint, MadmomLaunchConfig, MidiCommand, MidiCommandKind, OrientationDevice,
+    OrientationInputState, OrientationQuaternion,
 };
 use domers_outputs::{
     apply_bar_commands, apply_dome_commands, apply_stage_commands, BarCommand, DomeCommand,
@@ -130,6 +130,8 @@ pub struct InputStatus {
     pub orientation_adapter: InputAdapterStatus,
     /// Managed Madmom sidecar status.
     pub madmom_adapter: InputAdapterStatus,
+    /// Ableton Link / Carabiner-compatible sidecar status.
+    pub link_adapter: InputAdapterStatus,
 }
 
 /// Browser-facing MIDI log entry.
@@ -549,6 +551,21 @@ impl ServerState {
         }
     }
 
+    /// Parse and record an Ableton Link / Carabiner sidecar tempo line.
+    pub fn report_link_line(&mut self, line: &str) -> bool {
+        if let Some(event) = parse_link_tempo_line(line) {
+            self.inputs.link_adapter.events = self.inputs.link_adapter.events.saturating_add(1);
+            self.inputs.link_adapter.last_error = None;
+            self.inputs
+                .beat
+                .report_link_tempo(event.bpm, event.phase, self.now_ms());
+            true
+        } else {
+            self.inputs.link_adapter.last_error = Some("malformed Link tempo line".to_string());
+            false
+        }
+    }
+
     /// Apply MIDI commands to runtime state.
     pub fn apply_midi_commands(&mut self, commands: &[MidiCommand]) {
         self.inputs.midi_commands = self
@@ -670,6 +687,12 @@ impl ServerState {
         } else {
             None
         };
+        self.inputs.link_adapter.enabled = matches!(config.tempo.source, TempoSource::Link);
+        self.inputs.link_adapter.target = if self.inputs.link_adapter.enabled {
+            Some(config.carabiner.command.clone())
+        } else {
+            None
+        };
     }
 
     fn record_input_adapter_error(&mut self, adapter: InputAdapter, error: impl Into<String>) {
@@ -678,6 +701,7 @@ impl ServerState {
             InputAdapter::Midi => &mut self.inputs.midi_adapter,
             InputAdapter::Orientation => &mut self.inputs.orientation_adapter,
             InputAdapter::Madmom => &mut self.inputs.madmom_adapter,
+            InputAdapter::Link => &mut self.inputs.link_adapter,
         };
         status.enabled = true;
         status.last_error = Some(error.into());
@@ -773,6 +797,7 @@ impl ServerState {
             midi_adapter: self.inputs.midi_adapter.clone(),
             orientation_adapter: self.inputs.orientation_adapter.clone(),
             madmom_adapter: self.inputs.madmom_adapter.clone(),
+            link_adapter: self.inputs.link_adapter.clone(),
         }
     }
 }
@@ -791,6 +816,7 @@ struct InputRuntime {
     midi_adapter: InputAdapterStatus,
     orientation_adapter: InputAdapterStatus,
     madmom_adapter: InputAdapterStatus,
+    link_adapter: InputAdapterStatus,
 }
 
 #[derive(Clone, Copy)]
@@ -799,6 +825,7 @@ enum InputAdapter {
     Midi,
     Orientation,
     Madmom,
+    Link,
 }
 
 fn midi_binding_matches(binding: &MidiBindingConfig, command: MidiCommand) -> bool {
@@ -973,6 +1000,9 @@ impl AppRuntime {
         }
         if matches!(config.tempo.source, TempoSource::Madmom) {
             tasks.push(spawn_madmom_task(self.state.clone(), config.clone()));
+        }
+        if matches!(config.tempo.source, TempoSource::Link) {
+            tasks.push(spawn_link_task(self.state.clone(), config.clone()));
         }
     }
 
@@ -1295,6 +1325,58 @@ fn spawn_madmom_task(state: Arc<Mutex<ServerState>>, config: DomersConfig) -> Jo
                 .lock()
                 .await
                 .record_input_adapter_error(InputAdapter::Madmom, error.to_string());
+        }
+    })
+}
+
+fn spawn_link_task(state: Arc<Mutex<ServerState>>, config: DomersConfig) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut child = match Command::new(&config.carabiner.command)
+            .args(config.carabiner.args)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .stdin(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(error) => {
+                state
+                    .lock()
+                    .await
+                    .record_input_adapter_error(InputAdapter::Link, error.to_string());
+                return;
+            }
+        };
+        let Some(stdout) = child.stdout.take() else {
+            state
+                .lock()
+                .await
+                .record_input_adapter_error(InputAdapter::Link, "Link sidecar stdout unavailable");
+            let _ = child.kill().await;
+            return;
+        };
+        let mut lines = BufReader::new(stdout).lines();
+        loop {
+            match lines.next_line().await {
+                Ok(Some(line)) => {
+                    state.lock().await.report_link_line(&line);
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    state
+                        .lock()
+                        .await
+                        .record_input_adapter_error(InputAdapter::Link, error.to_string());
+                    break;
+                }
+            }
+        }
+        if let Err(error) = child.wait().await {
+            state
+                .lock()
+                .await
+                .record_input_adapter_error(InputAdapter::Link, error.to_string());
         }
     })
 }
@@ -2540,6 +2622,39 @@ mod tests {
         assert_eq!(snapshot.inputs.madmom_beats, 2);
         assert_eq!(snapshot.inputs.beat_ms, Some(400));
         assert_eq!(snapshot.inputs.madmom_adapter.last_error, None);
+    }
+
+    #[tokio::test]
+    async fn runtime_link_fake_sidecar_feeds_tempo() {
+        let script = env::temp_dir().join(format!("domers-fake-link-{}.sh", std::process::id()));
+        fs::write(
+            &script,
+            "#!/bin/sh\nprintf 'LINK 120 0.25\\n'\nsleep 0.02\nprintf 'tempo=90 phase=0.5\\n'\n",
+        )
+        .expect("fake link sidecar script writes");
+
+        let mut config = DomersConfig::default();
+        config.tempo.source = TempoSource::Link;
+        config.carabiner.command = "sh".to_string();
+        config.carabiner.args = vec![script.to_string_lossy().to_string()];
+        let runtime = AppRuntime::new(config);
+
+        runtime.start().await;
+        let mut snapshot = runtime.snapshot().await;
+        for _ in 0..50 {
+            if snapshot.inputs.link_adapter.events >= 2 {
+                break;
+            }
+            time::sleep(Duration::from_millis(10)).await;
+            snapshot = runtime.snapshot().await;
+        }
+        runtime.stop().await;
+        let _ = fs::remove_file(script);
+
+        assert_eq!(snapshot.inputs.link_adapter.events, 2);
+        assert_eq!(snapshot.inputs.beat_ms, Some(667));
+        assert_eq!(snapshot.inputs.bpm, "89");
+        assert_eq!(snapshot.inputs.link_adapter.last_error, None);
     }
 
     #[test]

@@ -18,6 +18,8 @@ const configTempoSource = document.querySelector('#config-tempo-source');
 const configMadmomCommand = document.querySelector('#config-madmom-command');
 const configMadmomTracker = document.querySelector('#config-madmom-tracker');
 const configMadmomAudioIndex = document.querySelector('#config-madmom-audio-index');
+const configCarabinerCommand = document.querySelector('#config-carabiner-command');
+const configCarabinerArgs = document.querySelector('#config-carabiner-args');
 const configMidiBindings = document.querySelector('#config-midi-bindings');
 const configDomeEnabled = document.querySelector('#config-dome-enabled');
 const configDomeSimulationEnabled = document.querySelector('#config-dome-simulation-enabled');
@@ -46,6 +48,7 @@ const inputAudio = document.querySelector('#input-audio');
 const inputMidi = document.querySelector('#input-midi');
 const inputOrientation = document.querySelector('#input-orientation');
 const inputMadmom = document.querySelector('#input-madmom');
+const inputLink = document.querySelector('#input-link');
 const orientationDevices = document.querySelector('#orientation-devices');
 const midiLog = document.querySelector('#midi-log');
 const tempoBpm = document.querySelector('#tempo-bpm');
@@ -134,6 +137,12 @@ function updateStructuredConfigFields(config) {
   }
   if (configMadmomAudioIndex) {
     configMadmomAudioIndex.value = config.madmom?.audio_input_index ?? '';
+  }
+  if (configCarabinerCommand) {
+    configCarabinerCommand.value = config.carabiner?.command ?? '';
+  }
+  if (configCarabinerArgs) {
+    configCarabinerArgs.value = (config.carabiner?.args ?? []).join(' ');
   }
   if (configMidiBindings) {
     const bindings = config.inputs?.midi?.bindings ?? [];
@@ -238,6 +247,7 @@ function updateConfigFromStructuredFields() {
   config.inputs.orientation ??= {};
   config.tempo ??= {};
   config.madmom ??= {};
+  config.carabiner ??= {};
   config.dome ??= {};
   config.bar ??= {};
   config.stage ??= {};
@@ -254,6 +264,8 @@ function updateConfigFromStructuredFields() {
   } else {
     delete config.madmom.audio_input_index;
   }
+  config.carabiner.command = configCarabinerCommand?.value?.trim() || 'carabiner';
+  config.carabiner.args = (configCarabinerArgs?.value ?? '').trim().split(/\s+/).filter(Boolean);
   config.dome.enabled = Boolean(configDomeEnabled?.checked);
   config.dome.simulation_enabled = Boolean(configDomeSimulationEnabled?.checked);
   config.dome.opc_address = configDomeOpcAddress?.value?.trim() ?? '';
@@ -376,6 +388,7 @@ function updateInputStatus(inputs) {
     `${inputs.orientation_devices?.length ?? 0} devices, last ${inputs.last_orientation ?? 'none'}`,
   );
   updateInputAdapterStatus(inputMadmom, inputs.madmom_adapter, `${inputs.madmom_beats ?? 0} beats`);
+  updateInputAdapterStatus(inputLink, inputs.link_adapter, `${inputs.beat_ms ?? 'n/a'}ms beat`);
   updateOrientationDevices(inputs.orientation_devices ?? []);
   updateMidiLog(inputs.midi_log ?? []);
   if (tempoBpm) {

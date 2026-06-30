@@ -105,6 +105,26 @@ impl BeatBroadcaster {
         }
     }
 
+    /// Report an Ableton Link tempo update.
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "Link BPM values are positive musical tempos converted to millisecond periods"
+    )]
+    pub fn report_link_tempo(&mut self, bpm: f64, phase: Option<f64>, realtime_ms: u64) {
+        if !bpm.is_finite() || bpm <= 0.0 {
+            return;
+        }
+        let beat_ms = (60_000.0 / bpm).round().max(1.0) as u64;
+        let phase_offset_ms = phase
+            .map(|value| (value.rem_euclid(1.0) * beat_ms as f64).round() as u64)
+            .unwrap_or(0);
+        let anchor_ms = realtime_ms.saturating_sub(phase_offset_ms);
+        self.clock = Some(BeatClock::new(beat_ms, anchor_ms));
+        self.taps.clear();
+        self.madmom_beats.clear();
+    }
+
     /// Beat length in milliseconds, if known.
     #[must_use]
     pub fn beat_ms(&self) -> Option<u64> {
@@ -262,5 +282,16 @@ mod tests {
         beat.report_madmom_beat(3_300, 3_300);
 
         assert_eq!(beat.beat_ms(), Some(400));
+    }
+
+    #[test]
+    fn link_tempo_sets_bpm_and_phase() {
+        let mut beat = BeatBroadcaster::default();
+
+        beat.report_link_tempo(120.0, Some(0.25), 10_000);
+
+        assert_eq!(beat.beat_ms(), Some(500));
+        assert_eq!(beat.bpm_string(), "120");
+        assert_close(beat.progress(10_000, 1.0), 0.25);
     }
 }

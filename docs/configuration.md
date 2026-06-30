@@ -57,6 +57,12 @@ flash_speed = 0.0
 command = "DBNBeatTracker"
 audio_input_index = 0
 
+[carabiner]
+command = "carabiner"
+args = []
+human_link_output = false
+madmom_link_output = false
+
 [color_palette]
 banks = [
   ["entry_01", "entry_02", "entry_03", "entry_04", "entry_05", "entry_06", "entry_07", "entry_08"],
@@ -143,9 +149,9 @@ Supported MIDI binding actions are:
 - `palette`: set the active palette. Use `target_index` for a fixed palette or omit it to map command value across palettes 0-7.
 - `visualizer`: set the active dome visualizer. Use `target_index` for a fixed visualizer or omit it to map command value across visualizers 0-8.
 
-The first no-hardware version treats UDP audio and MIDI as intentional local
-replacement transports for native device capture. Behavior above the transport
-is still exercised through automated tests.
+UDP audio and MIDI remain useful bridge transports, but they are not the full
+native-device scope. macOS/Linux native audio and MIDI capture are parity work;
+device identity/index semantics are already represented in config and tests.
 
 `inputs.audio.devices` is optional. When present, it models Spectrum's audio
 enumeration rule: all active endpoints receive an index, but only capture
@@ -255,6 +261,34 @@ BEAT:12.345
 ```
 
 Bundling Madmom is a release packaging choice, not a runtime path assumption. A packaged `dome-rs` build needs either a working Madmom distribution or a documented one-command installer so operators do not have to assemble the beat tracker by hand.
+
+## Ableton Link / Carabiner Config
+
+Ableton Link sync is enabled with `tempo.source = "link"`. `domers run` starts
+the configured macOS/Linux sidecar command and reads tempo lines from stdout.
+The sidecar can be a Carabiner-compatible bridge or a native Link bridge.
+
+```toml
+[tempo]
+source = "link"
+flash_speed = 0.0
+
+[carabiner]
+command = "carabiner"
+args = ["--stdout-tempo"]
+human_link_output = false
+madmom_link_output = false
+```
+
+Accepted stdout examples:
+
+```text
+LINK 120 0.25
+BPM: 120
+tempo=120 phase=0.25
+```
+
+`phase` is optional and normalized into `[0.0, 1.0)`.
 
 See [`intentional-deviations.md`](intentional-deviations.md) for the rationale.
 

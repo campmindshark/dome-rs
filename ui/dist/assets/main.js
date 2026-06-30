@@ -7337,6 +7337,12 @@ function updateStructuredConfigFields(config) {
   if (configMadmomAudioIndex) {
     configMadmomAudioIndex.value = config.madmom?.audio_input_index ?? "";
   }
+  if (configCarabinerCommand) {
+    configCarabinerCommand.value = config.carabiner?.command ?? "";
+  }
+  if (configCarabinerArgs) {
+    configCarabinerArgs.value = (config.carabiner?.args ?? []).join(" ");
+  }
   if (configMidiBindings) {
     const bindings = config.inputs?.midi?.bindings ?? [];
     configMidiBindings.textContent = bindings.length ? bindings.map((binding) => `${binding.command_kind}:${binding.index}->${binding.action}`).join(", ") : "none";
@@ -7432,6 +7438,7 @@ function updateConfigFromStructuredFields() {
   config.inputs.orientation ??= {};
   config.tempo ??= {};
   config.madmom ??= {};
+  config.carabiner ??= {};
   config.dome ??= {};
   config.bar ??= {};
   config.stage ??= {};
@@ -7448,6 +7455,8 @@ function updateConfigFromStructuredFields() {
   } else {
     delete config.madmom.audio_input_index;
   }
+  config.carabiner.command = configCarabinerCommand?.value?.trim() || "carabiner";
+  config.carabiner.args = (configCarabinerArgs?.value ?? "").trim().split(/\s+/).filter(Boolean);
   config.dome.enabled = Boolean(configDomeEnabled?.checked);
   config.dome.simulation_enabled = Boolean(configDomeSimulationEnabled?.checked);
   config.dome.opc_address = configDomeOpcAddress?.value?.trim() ?? "";
@@ -7564,6 +7573,7 @@ function updateInputStatus(inputs) {
     `${inputs.orientation_devices?.length ?? 0} devices, last ${inputs.last_orientation ?? "none"}`
   );
   updateInputAdapterStatus(inputMadmom, inputs.madmom_adapter, `${inputs.madmom_beats ?? 0} beats`);
+  updateInputAdapterStatus(inputLink, inputs.link_adapter, `${inputs.beat_ms ?? "n/a"}ms beat`);
   updateOrientationDevices(inputs.orientation_devices ?? []);
   updateMidiLog(inputs.midi_log ?? []);
   if (tempoBpm) {
@@ -8016,7 +8026,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioDeviceId, configMidiBind, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightness, configStageSideLengths, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputOrientation, inputMadmom, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, previewDrawer, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, simulatorStarted, simulatorSocket;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioDeviceId, configMidiBind, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightness, configStageSideLengths, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, previewDrawer, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, simulatorStarted, simulatorSocket;
 var init_main = __esm({
   async "domers/ui/main.mjs"() {
     "use strict";
@@ -8040,6 +8050,8 @@ var init_main = __esm({
     configMadmomCommand = document.querySelector("#config-madmom-command");
     configMadmomTracker = document.querySelector("#config-madmom-tracker");
     configMadmomAudioIndex = document.querySelector("#config-madmom-audio-index");
+    configCarabinerCommand = document.querySelector("#config-carabiner-command");
+    configCarabinerArgs = document.querySelector("#config-carabiner-args");
     configMidiBindings = document.querySelector("#config-midi-bindings");
     configDomeEnabled = document.querySelector("#config-dome-enabled");
     configDomeSimulationEnabled = document.querySelector("#config-dome-simulation-enabled");
@@ -8068,6 +8080,7 @@ var init_main = __esm({
     inputMidi = document.querySelector("#input-midi");
     inputOrientation = document.querySelector("#input-orientation");
     inputMadmom = document.querySelector("#input-madmom");
+    inputLink = document.querySelector("#input-link");
     orientationDevices = document.querySelector("#orientation-devices");
     midiLog = document.querySelector("#midi-log");
     tempoBpm = document.querySelector("#tempo-bpm");
@@ -8254,7 +8267,7 @@ function ConfigEditor() {
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { id: "config-tempo-source", name: "configTempoSource", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "human", children: "Human" }),
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "madmom", children: "Madmom" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "link_unsupported", children: "Link unsupported" })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "link", children: "Ableton Link / Carabiner" })
             ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
@@ -8268,6 +8281,16 @@ function ConfigEditor() {
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Audio input index" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-madmom-audio-index", name: "configMadmomAudioIndex", type: "number", min: "0", placeholder: "0" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Link sidecar command" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: 'macOS/Linux command that prints tempo lines such as "LINK 120 0.25".' }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-carabiner-command", name: "configCarabinerCommand", type: "text", placeholder: "carabiner" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Link sidecar args" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Whitespace-separated arguments for the Link sidecar." }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-carabiner-args", name: "configCarabinerArgs", type: "text", placeholder: "--stdout-tempo" })
           ] })
         ] })
       ] }),
@@ -8506,6 +8529,10 @@ function OpcTargetsFooter() {
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Madmom" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-madmom", children: "disabled" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Link" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-link", children: "disabled" })
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Orientation Devices", children: [

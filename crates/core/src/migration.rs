@@ -55,8 +55,6 @@ const STALE_FIELDS: &[&str] = &[
 
 const INERT_FIELDS: &[&str] = &[
     "domeAutoFlashDelay",
-    "humanLinkOutput",
-    "madmomLinkOutput",
     "channelToAudioLevelDriverPreset",
     "channelToMidiLevelDriverPreset",
 ];
@@ -139,7 +137,8 @@ mod tests {
         assert!(report.contains(WarningKind::StaleField, "kickT"));
         assert!(report.contains(WarningKind::StaleField, "snareT"));
         assert!(report.contains(WarningKind::InertField, "domeAutoFlashDelay"));
-        assert!(report.contains(WarningKind::InertField, "humanLinkOutput"));
+        assert!(!report.contains(WarningKind::InertField, "humanLinkOutput"));
+        assert!(!report.contains(WarningKind::InertField, "madmomLinkOutput"));
         assert!(report.contains(WarningKind::InvalidMidiBindingTarget, "kickT"));
         assert!(report.contains(WarningKind::InvalidMidiBindingTarget, "snareT"));
     }

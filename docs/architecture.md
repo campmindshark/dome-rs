@@ -82,7 +82,7 @@ The live control page keeps simulator work lazy. It fetches runtime state on loa
 
 ## Beat And Input Runtime
 
-The runtime accepts tap tempo, MIDI commands, audio volume samples, orientation datagrams, and Madmom-compatible `BEAT:{seconds}` lines through explicit input paths. `domers run` can start optional UDP adapters for audio, MIDI, and orientation, and it manages the Madmom sidecar when `tempo.source = "madmom"`. The server exposes adapter targets, event counters, and last errors in `/api/state`; `POST /api/input/tap` records human tap tempo.
+The runtime accepts tap tempo, MIDI commands, audio volume samples, orientation datagrams, Madmom-compatible `BEAT:{seconds}` lines, and Link/Carabiner-compatible tempo lines through explicit input paths. `domers run` can start optional UDP adapters for audio, MIDI, and orientation. It manages the Madmom sidecar when `tempo.source = "madmom"` and the Link sidecar when `tempo.source = "link"`. The server exposes adapter targets, event counters, and last errors in `/api/state`; `POST /api/input/tap` records human tap tempo.
 
 ## Intentional Deviations
 

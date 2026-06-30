@@ -79,7 +79,7 @@ function ConfigEditor() {
               <select id="config-tempo-source" name="configTempoSource">
                 <option value="human">Human</option>
                 <option value="madmom">Madmom</option>
-                <option value="link_unsupported">Link unsupported</option>
+                <option value="link">Ableton Link / Carabiner</option>
               </select>
             </label>
             <label className="config-field">
@@ -93,6 +93,16 @@ function ConfigEditor() {
             <label className="config-field">
               <span className="config-field-label">Audio input index</span>
               <input id="config-madmom-audio-index" name="configMadmomAudioIndex" type="number" min="0" placeholder="0" />
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Link sidecar command</span>
+              <span className="field-hint">macOS/Linux command that prints tempo lines such as "LINK 120 0.25".</span>
+              <input id="config-carabiner-command" name="configCarabinerCommand" type="text" placeholder="carabiner" />
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Link sidecar args</span>
+              <span className="field-hint">Whitespace-separated arguments for the Link sidecar.</span>
+              <input id="config-carabiner-args" name="configCarabinerArgs" type="text" placeholder="--stdout-tempo" />
             </label>
           </section>
         </div>
@@ -368,6 +378,10 @@ function OpcTargetsFooter() {
           <p className="target-status">
             <strong>Madmom</strong>
             <span id="input-madmom">disabled</span>
+          </p>
+          <p className="target-status">
+            <strong>Link</strong>
+            <span id="input-link">disabled</span>
           </p>
         </div>
         <section aria-label="Orientation Devices">

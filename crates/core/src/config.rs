@@ -48,6 +48,9 @@ pub struct DomersConfig {
     pub color_palette_index: u8,
     /// Madmom sidecar config.
     pub madmom: MadmomConfig,
+    /// Ableton Link / Carabiner-compatible sidecar config.
+    #[serde(default)]
+    pub carabiner: CarabinerConfig,
 }
 
 /// Dome fixture config.
@@ -254,8 +257,8 @@ pub enum TempoSource {
     Human,
     /// Madmom sidecar beat detector.
     Madmom,
-    /// Ableton Link is intentionally not implemented yet.
-    LinkUnsupported,
+    /// Ableton Link / Carabiner tempo sync.
+    Link,
 }
 
 /// Madmom sidecar config.
@@ -268,6 +271,33 @@ pub struct MadmomConfig {
     pub tracker: Option<String>,
     /// Optional audio input index to pass through.
     pub audio_input_index: Option<u32>,
+}
+
+/// Ableton Link / Carabiner-compatible sidecar config.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CarabinerConfig {
+    /// Sidecar executable or command name.
+    pub command: String,
+    /// Extra command-line arguments.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    /// Whether human tap tempo should be sent to Link.
+    #[serde(default)]
+    pub human_link_output: bool,
+    /// Whether Madmom tempo should be sent to Link.
+    #[serde(default)]
+    pub madmom_link_output: bool,
+}
+
+impl Default for CarabinerConfig {
+    fn default() -> Self {
+        Self {
+            command: "carabiner".to_string(),
+            args: Vec::new(),
+            human_link_output: false,
+            madmom_link_output: false,
+        }
+    }
 }
 
 /// Result of importing a legacy Spectrum XML config.
@@ -333,6 +363,7 @@ impl Default for DomersConfig {
                 tracker: None,
                 audio_input_index: None,
             },
+            carabiner: CarabinerConfig::default(),
         }
     }
 }
@@ -384,6 +415,8 @@ struct DomersConfigToml {
     #[serde(default)]
     color_palette_index: u8,
     madmom: MadmomConfig,
+    #[serde(default)]
+    carabiner: CarabinerConfig,
 }
 
 impl From<DomersConfigToml> for DomersConfig {
@@ -397,6 +430,7 @@ impl From<DomersConfigToml> for DomersConfig {
             color_palette: config.color_palette.into_color_palette(),
             color_palette_index: config.color_palette_index,
             madmom: config.madmom,
+            carabiner: config.carabiner,
         }
     }
 }
@@ -456,6 +490,7 @@ struct DomersConfigTomlOut {
     inputs: InputConfig,
     color_palette: ColorPaletteDryToml,
     madmom: MadmomConfig,
+    carabiner: CarabinerConfig,
 }
 
 impl From<&DomersConfig> for DomersConfigTomlOut {
@@ -469,6 +504,7 @@ impl From<&DomersConfig> for DomersConfigTomlOut {
             inputs: config.inputs.clone(),
             color_palette: ColorPaletteDryToml::from(&config.color_palette),
             madmom: config.madmom.clone(),
+            carabiner: config.carabiner.clone(),
         }
     }
 }
@@ -545,9 +581,13 @@ pub fn import_spectrum_xml(xml: &str) -> ImportedConfig {
 
     config.tempo.source = match u8_tag(xml, "beatInput").unwrap_or(0) {
         1 => TempoSource::Madmom,
-        2 => TempoSource::LinkUnsupported,
+        2 => TempoSource::Link,
         _ => TempoSource::Human,
     };
+    config.carabiner.human_link_output =
+        bool_tag(xml, "humanLinkOutput").unwrap_or(config.carabiner.human_link_output);
+    config.carabiner.madmom_link_output =
+        bool_tag(xml, "madmomLinkOutput").unwrap_or(config.carabiner.madmom_link_output);
     config.tempo.flash_speed = f64_tag(xml, "flashSpeed").unwrap_or(config.tempo.flash_speed);
     config.inputs.audio.device_id = tag_value(xml, "audioDeviceID").map(str::to_string);
     config.color_palette = color_palette(xml);
