@@ -1,5 +1,7 @@
 //! Engine configuration model skeleton.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::color::{ColorPalette, PaletteEntry};
@@ -214,7 +216,7 @@ impl DomersConfig {
     ///
     /// Returns an error if TOML serialization fails.
     pub fn to_toml_string(&self) -> Result<String, toml::ser::Error> {
-        toml::to_string_pretty(self)
+        toml::to_string_pretty(&DomersConfigTomlOut::from(self))
     }
 
     /// Parse native Domers TOML.
@@ -223,7 +225,138 @@ impl DomersConfig {
     ///
     /// Returns an error if TOML parsing fails.
     pub fn from_toml_str(input: &str) -> Result<Self, toml::de::Error> {
-        toml::from_str(input)
+        toml::from_str::<DomersConfigToml>(input).map(Into::into)
+    }
+}
+
+#[derive(Deserialize)]
+struct DomersConfigToml {
+    dome: DomeConfig,
+    bar: BarConfig,
+    stage: StageConfig,
+    tempo: TempoConfig,
+    #[serde(default)]
+    color_palette: ColorPaletteToml,
+    #[serde(default)]
+    color_palette_index: u8,
+    madmom: MadmomConfig,
+}
+
+impl From<DomersConfigToml> for DomersConfig {
+    fn from(config: DomersConfigToml) -> Self {
+        Self {
+            dome: config.dome,
+            bar: config.bar,
+            stage: config.stage,
+            tempo: config.tempo,
+            color_palette: config.color_palette.into_color_palette(),
+            color_palette_index: config.color_palette_index,
+            madmom: config.madmom,
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+struct ColorPaletteToml {
+    #[serde(default)]
+    colors: Vec<PaletteEntry>,
+    #[serde(default)]
+    entries: BTreeMap<String, PaletteEntry>,
+    #[serde(default)]
+    banks: Vec<Vec<String>>,
+    #[serde(default)]
+    slots: Vec<String>,
+}
+
+impl ColorPaletteToml {
+    fn into_color_palette(self) -> ColorPalette {
+        if !self.colors.is_empty() {
+            return ColorPalette {
+                colors: normalize_palette_slots(self.colors),
+            };
+        }
+
+        let slot_names: Vec<_> = if self.banks.is_empty() {
+            self.slots
+        } else {
+            self.banks.into_iter().flatten().collect()
+        };
+        if slot_names.is_empty() {
+            return ColorPalette::default();
+        }
+
+        let colors = slot_names
+            .into_iter()
+            .map(|name| self.entries.get(&name).copied().unwrap_or_default())
+            .collect();
+        ColorPalette {
+            colors: normalize_palette_slots(colors),
+        }
+    }
+}
+
+fn normalize_palette_slots(mut colors: Vec<PaletteEntry>) -> Vec<PaletteEntry> {
+    colors.truncate(ColorPalette::ENTRY_COUNT);
+    colors.resize(ColorPalette::ENTRY_COUNT, PaletteEntry::default());
+    colors
+}
+
+#[derive(Serialize)]
+struct DomersConfigTomlOut {
+    color_palette_index: u8,
+    dome: DomeConfig,
+    bar: BarConfig,
+    stage: StageConfig,
+    tempo: TempoConfig,
+    color_palette: ColorPaletteDryToml,
+    madmom: MadmomConfig,
+}
+
+impl From<&DomersConfig> for DomersConfigTomlOut {
+    fn from(config: &DomersConfig) -> Self {
+        Self {
+            color_palette_index: config.color_palette_index,
+            dome: config.dome.clone(),
+            bar: config.bar.clone(),
+            stage: config.stage.clone(),
+            tempo: config.tempo.clone(),
+            color_palette: ColorPaletteDryToml::from(&config.color_palette),
+            madmom: config.madmom.clone(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ColorPaletteDryToml {
+    banks: Vec<Vec<String>>,
+    entries: BTreeMap<String, PaletteEntry>,
+}
+
+impl From<&ColorPalette> for ColorPaletteDryToml {
+    fn from(palette: &ColorPalette) -> Self {
+        let mut unique: Vec<(PaletteEntry, String)> = Vec::new();
+        let mut slots = Vec::new();
+        for entry in normalize_palette_slots(palette.colors.clone()) {
+            let name =
+                if let Some((_, name)) = unique.iter().find(|(candidate, _)| *candidate == entry) {
+                    name.clone()
+                } else {
+                    let name = format!("entry_{:02}", unique.len() + 1);
+                    unique.push((entry, name.clone()));
+                    name
+                };
+            slots.push(name);
+        }
+
+        let banks = slots
+            .chunks(ColorPalette::COLORS_PER_BANK)
+            .map(<[String]>::to_vec)
+            .collect();
+        let entries = unique
+            .into_iter()
+            .map(|(entry, name)| (name, entry))
+            .collect();
+        Self { banks, entries }
     }
 }
 
@@ -395,9 +528,13 @@ mod tests {
         let toml = config.to_toml_string().expect("config serializes");
         assert!(toml.contains("[dome]"));
         assert!(toml.contains("[madmom]"));
+        assert!(toml.contains("[color_palette]"));
+        assert!(toml.contains("[color_palette.entries.entry_"));
+        assert!(!toml.contains("[[color_palette.colors]]"));
 
         let parsed = DomersConfig::from_toml_str(&toml).expect("config parses");
         assert_eq!(parsed.dome.active_visualizer, config.dome.active_visualizer);
+        assert_eq!(parsed.color_palette, config.color_palette);
     }
 
     #[test]
@@ -407,6 +544,9 @@ mod tests {
 
         assert!(parsed.dome.simulation_enabled);
         assert_eq!(parsed.madmom.command, "DBNBeatTracker");
+        assert_eq!(parsed.color_palette.colors.len(), ColorPalette::ENTRY_COUNT);
+        assert!(toml.contains("[color_palette.entries.entry_"));
+        assert!(!toml.contains("[[color_palette.colors]]"));
     }
 
     #[test]

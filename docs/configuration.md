@@ -59,10 +59,15 @@ TOML fits the project well: it is common in Rust, easy to diff, and strict enoug
 
 ## Color Palette
 
-The runtime palette follows Spectrum's layout: eight palette banks with eight entries each, stored as 64 entries in absolute index order.
+The runtime palette follows Spectrum's layout: eight palette banks with eight slots each. The TOML keeps that slot layout while defining duplicate color entries only once.
 
 ```toml
-[[color_palette.colors]]
+[color_palette]
+banks = [
+  ["entry_01", "entry_02", "entry_03", "entry_04", "entry_05", "entry_06", "entry_07", "entry_08"],
+]
+
+[color_palette.entries.entry_01]
 color1 = 16711680
 color2 = 15792383
 color2_enabled = true
@@ -71,7 +76,8 @@ color2_enabled = true
 - `color1` and `color2` use Spectrum's `0xRRGGBB` integer convention.
 - `color2_enabled = false` makes the entry a solid `color1`.
 - `color2_enabled = true` enables Spectrum-compatible gradient blending.
-- Runtime palette slot `N` uses entries `N * 8` through `N * 8 + 7`.
+- Runtime palette slot `N` still uses bank `N` with eight entries; repeated bank references intentionally share one entry definition.
+- The old verbose `[[color_palette.colors]]` 64-entry absolute form still parses for compatibility.
 
 If `color_palette` is omitted, `dome-rs` creates a default 64-entry palette with visible starter colors in entries 0-2.
 
