@@ -8208,122 +8208,157 @@ function VisualizerSelect({ id, name }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("select", { id, name, children: visualizerOptions.map((label, value) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value, children: label }, label)) });
 }
 function ConfigEditor() {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { id: "config-drawer", "aria-label": "Config Editor", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { id: "config-drawer", className: "config-drawer", "aria-label": "Config Editor", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { children: "Config Editor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Edit the full native configuration as JSON. Applying config restarts live input adapters when the engine is running." }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("fieldset", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("legend", { children: "Input And Tempo Config" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Audio UDP bind",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-audio-bind", name: "configAudioBind", type: "text" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Audio device ID",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-audio-device-id", name: "configAudioDeviceId", type: "text" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "MIDI UDP bind",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-midi-bind", name: "configMidiBind", type: "text" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Orientation UDP bind",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-orientation-bind", name: "configOrientationBind", type: "text" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Tempo source",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { id: "config-tempo-source", name: "configTempoSource", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "human", children: "Human" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "madmom", children: "Madmom" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "link_unsupported", children: "Link unsupported" })
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "drawer-intro", children: "Edit the full native configuration as JSON. Applying config restarts live input adapters when the engine is running." }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("fieldset", { className: "config-panel", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("legend", { children: "Input And Tempo" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "config-section-grid", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "Audio input config", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Audio" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "UDP bind" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Address used by the bridge or simulator volume source." }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-audio-bind", name: "configAudioBind", type: "text", placeholder: "127.0.0.1:9001" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Device ID" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Optional native device identifier. Leave blank to use bridge input only." }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-audio-device-id", name: "configAudioDeviceId", type: "text", placeholder: "default input device" })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "MIDI input config", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "MIDI" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "UDP bind" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Address for MIDI command datagrams." }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-midi-bind", name: "configMidiBind", type: "text", placeholder: "127.0.0.1:9002" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "midi-bindings-summary", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Bindings" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "config-midi-bindings", children: "none" })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "Orientation input config", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Orientation" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "UDP bind" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Address for controller orientation packets." }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-orientation-bind", name: "configOrientationBind", type: "text", placeholder: "127.0.0.1:9003" })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "Tempo and Madmom config", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Tempo / Madmom" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Tempo source" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", { id: "config-tempo-source", name: "configTempoSource", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "human", children: "Human" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "madmom", children: "Madmom" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: "link_unsupported", children: "Link unsupported" })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Command" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-madmom-command", name: "configMadmomCommand", type: "text", placeholder: "python BeatTracker.py" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Tracker" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-madmom-tracker", name: "configMadmomTracker", type: "text", placeholder: "DBNBeatTrackingProcessor" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Audio input index" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-madmom-audio-index", name: "configMadmomAudioIndex", type: "number", min: "0", placeholder: "0" })
+          ] })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Madmom command",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-madmom-command", name: "configMadmomCommand", type: "text" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Madmom tracker",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-madmom-tracker", name: "configMadmomTracker", type: "text" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Madmom audio input index",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-madmom-audio-index", name: "configMadmomAudioIndex", type: "number", min: "0" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { id: "apply-structured-config", type: "button", children: "Apply Structured Config" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [
-        "MIDI bindings: ",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "config-midi-bindings", children: "none" })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { id: "apply-structured-config", type: "button", children: "Apply Structured Config" })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("fieldset", { className: "config-panel", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("legend", { children: "Output And Layout" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "config-section-grid output-config-grid", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "Dome output config", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Dome" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "checkbox-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-enabled", name: "configDomeEnabled", type: "checkbox" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Hardware enabled" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "checkbox-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-simulation-enabled", name: "configDomeSimulationEnabled", type: "checkbox" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Simulator enabled" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "OPC address" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-opc-address", name: "configDomeOpcAddress", type: "text", placeholder: "127.0.0.1:7890" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Brightness" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-brightness", name: "configDomeBrightness", type: "number", min: "0", max: "1", step: "0.01" })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "Bar output config", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Bar" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "checkbox-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-enabled", name: "configBarEnabled", type: "checkbox" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Hardware enabled" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "checkbox-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-simulation-enabled", name: "configBarSimulationEnabled", type: "checkbox" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Simulator enabled" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "inline-field-grid", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Infinity length" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-infinity-length", name: "configBarInfinityLength", type: "number", min: "0", step: "1" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Infinity width" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-infinity-width", name: "configBarInfinityWidth", type: "number", min: "0", step: "1" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Runner length" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-runner-length", name: "configBarRunnerLength", type: "number", min: "0", step: "1" })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Brightness" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-brightness", name: "configBarBrightness", type: "number", min: "0", max: "1", step: "0.01" })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "config-card", "aria-label": "Stage output config", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Stage" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "checkbox-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-enabled", name: "configStageEnabled", type: "checkbox" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Hardware enabled" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "checkbox-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-simulation-enabled", name: "configStageSimulationEnabled", type: "checkbox" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Simulator enabled" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "OPC address" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-opc-address", name: "configStageOpcAddress", type: "text", placeholder: "127.0.0.1:7891" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Brightness" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-brightness", name: "configStageBrightness", type: "number", min: "0", max: "1", step: "0.01" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Side lengths" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Comma-separated pixel counts, one value per stage side." }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-side-lengths", name: "configStageSideLengths", type: "text", inputMode: "numeric", placeholder: "60, 60, 60, 60" })
+          ] })
+        ] })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("fieldset", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("legend", { children: "Output And Layout Config" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Dome hardware enabled",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-enabled", name: "configDomeEnabled", type: "checkbox" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Dome simulator enabled",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-simulation-enabled", name: "configDomeSimulationEnabled", type: "checkbox" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Dome OPC address",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-opc-address", name: "configDomeOpcAddress", type: "text" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Dome brightness",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-dome-brightness", name: "configDomeBrightness", type: "number", min: "0", max: "1", step: "0.01" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Bar hardware enabled",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-enabled", name: "configBarEnabled", type: "checkbox" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Bar simulator enabled",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-simulation-enabled", name: "configBarSimulationEnabled", type: "checkbox" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Bar infinity length",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-infinity-length", name: "configBarInfinityLength", type: "number", min: "0", step: "1" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Bar infinity width",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-infinity-width", name: "configBarInfinityWidth", type: "number", min: "0", step: "1" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Bar runner length",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-runner-length", name: "configBarRunnerLength", type: "number", min: "0", step: "1" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Bar brightness",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-bar-brightness", name: "configBarBrightness", type: "number", min: "0", max: "1", step: "0.01" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Stage hardware enabled",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-enabled", name: "configStageEnabled", type: "checkbox" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Stage simulator enabled",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-simulation-enabled", name: "configStageSimulationEnabled", type: "checkbox" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Stage OPC address",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-opc-address", name: "configStageOpcAddress", type: "text" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Stage brightness",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-brightness", name: "configStageBrightness", type: "number", min: "0", max: "1", step: "0.01" })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
-        "Stage side lengths",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", { id: "config-stage-side-lengths", className: "config-editor", name: "configStageSideLengths", rows: 3, spellCheck: false })
-      ] })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "config-actions", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { id: "reload-config", type: "button", children: "Reload Config" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { id: "apply-config", type: "button", children: "Apply Config" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { id: "apply-config", type: "button", children: "Apply JSON Config" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "config-status", children: "not loaded" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", { id: "config-editor", className: "config-editor", spellCheck: false, rows: 16 })
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field json-config-field", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Full JSON config" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", { id: "config-editor", className: "config-editor", spellCheck: false, rows: 16 })
+    ] })
   ] });
 }
 function RuntimeControls() {

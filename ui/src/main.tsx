@@ -30,130 +30,166 @@ function VisualizerSelect({ id, name }: { id: string; name: string }) {
 
 function ConfigEditor() {
   return (
-    <details id="config-drawer" aria-label="Config Editor">
+    <details id="config-drawer" className="config-drawer" aria-label="Config Editor">
       <summary>Config Editor</summary>
-      <p>
+      <p className="drawer-intro">
         Edit the full native configuration as JSON. Applying config restarts
         live input adapters when the engine is running.
       </p>
-      <fieldset>
-        <legend>Input And Tempo Config</legend>
-        <label>
-          Audio UDP bind
-          <input id="config-audio-bind" name="configAudioBind" type="text" />
-        </label>
-        <label>
-          Audio device ID
-          <input id="config-audio-device-id" name="configAudioDeviceId" type="text" />
-        </label>
-        <label>
-          MIDI UDP bind
-          <input id="config-midi-bind" name="configMidiBind" type="text" />
-        </label>
-        <label>
-          Orientation UDP bind
-          <input id="config-orientation-bind" name="configOrientationBind" type="text" />
-        </label>
-        <label>
-          Tempo source
-          <select id="config-tempo-source" name="configTempoSource">
-            <option value="human">Human</option>
-            <option value="madmom">Madmom</option>
-            <option value="link_unsupported">Link unsupported</option>
-          </select>
-        </label>
-        <label>
-          Madmom command
-          <input id="config-madmom-command" name="configMadmomCommand" type="text" />
-        </label>
-        <label>
-          Madmom tracker
-          <input id="config-madmom-tracker" name="configMadmomTracker" type="text" />
-        </label>
-        <label>
-          Madmom audio input index
-          <input id="config-madmom-audio-index" name="configMadmomAudioIndex" type="number" min="0" />
-        </label>
+      <fieldset className="config-panel">
+        <legend>Input And Tempo</legend>
+        <div className="config-section-grid">
+          <section className="config-card" aria-label="Audio input config">
+            <h3>Audio</h3>
+            <label className="config-field">
+              <span className="config-field-label">UDP bind</span>
+              <span className="field-hint">Address used by the bridge or simulator volume source.</span>
+              <input id="config-audio-bind" name="configAudioBind" type="text" placeholder="127.0.0.1:9001" />
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Device ID</span>
+              <span className="field-hint">Optional native device identifier. Leave blank to use bridge input only.</span>
+              <input id="config-audio-device-id" name="configAudioDeviceId" type="text" placeholder="default input device" />
+            </label>
+          </section>
+          <section className="config-card" aria-label="MIDI input config">
+            <h3>MIDI</h3>
+            <label className="config-field">
+              <span className="config-field-label">UDP bind</span>
+              <span className="field-hint">Address for MIDI command datagrams.</span>
+              <input id="config-midi-bind" name="configMidiBind" type="text" placeholder="127.0.0.1:9002" />
+            </label>
+            <p className="midi-bindings-summary">
+              <span className="config-field-label">Bindings</span>
+              <span id="config-midi-bindings">none</span>
+            </p>
+          </section>
+          <section className="config-card" aria-label="Orientation input config">
+            <h3>Orientation</h3>
+            <label className="config-field">
+              <span className="config-field-label">UDP bind</span>
+              <span className="field-hint">Address for controller orientation packets.</span>
+              <input id="config-orientation-bind" name="configOrientationBind" type="text" placeholder="127.0.0.1:9003" />
+            </label>
+          </section>
+          <section className="config-card" aria-label="Tempo and Madmom config">
+            <h3>Tempo / Madmom</h3>
+            <label className="config-field">
+              <span className="config-field-label">Tempo source</span>
+              <select id="config-tempo-source" name="configTempoSource">
+                <option value="human">Human</option>
+                <option value="madmom">Madmom</option>
+                <option value="link_unsupported">Link unsupported</option>
+              </select>
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Command</span>
+              <input id="config-madmom-command" name="configMadmomCommand" type="text" placeholder="python BeatTracker.py" />
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Tracker</span>
+              <input id="config-madmom-tracker" name="configMadmomTracker" type="text" placeholder="DBNBeatTrackingProcessor" />
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Audio input index</span>
+              <input id="config-madmom-audio-index" name="configMadmomAudioIndex" type="number" min="0" placeholder="0" />
+            </label>
+          </section>
+        </div>
         <button id="apply-structured-config" type="button">
           Apply Structured Config
         </button>
-        <p>
-          MIDI bindings: <span id="config-midi-bindings">none</span>
-        </p>
       </fieldset>
-      <fieldset>
-        <legend>Output And Layout Config</legend>
-        <label>
-          Dome hardware enabled
-          <input id="config-dome-enabled" name="configDomeEnabled" type="checkbox" />
-        </label>
-        <label>
-          Dome simulator enabled
-          <input id="config-dome-simulation-enabled" name="configDomeSimulationEnabled" type="checkbox" />
-        </label>
-        <label>
-          Dome OPC address
-          <input id="config-dome-opc-address" name="configDomeOpcAddress" type="text" />
-        </label>
-        <label>
-          Dome brightness
-          <input id="config-dome-brightness" name="configDomeBrightness" type="number" min="0" max="1" step="0.01" />
-        </label>
-        <label>
-          Bar hardware enabled
-          <input id="config-bar-enabled" name="configBarEnabled" type="checkbox" />
-        </label>
-        <label>
-          Bar simulator enabled
-          <input id="config-bar-simulation-enabled" name="configBarSimulationEnabled" type="checkbox" />
-        </label>
-        <label>
-          Bar infinity length
-          <input id="config-bar-infinity-length" name="configBarInfinityLength" type="number" min="0" step="1" />
-        </label>
-        <label>
-          Bar infinity width
-          <input id="config-bar-infinity-width" name="configBarInfinityWidth" type="number" min="0" step="1" />
-        </label>
-        <label>
-          Bar runner length
-          <input id="config-bar-runner-length" name="configBarRunnerLength" type="number" min="0" step="1" />
-        </label>
-        <label>
-          Bar brightness
-          <input id="config-bar-brightness" name="configBarBrightness" type="number" min="0" max="1" step="0.01" />
-        </label>
-        <label>
-          Stage hardware enabled
-          <input id="config-stage-enabled" name="configStageEnabled" type="checkbox" />
-        </label>
-        <label>
-          Stage simulator enabled
-          <input id="config-stage-simulation-enabled" name="configStageSimulationEnabled" type="checkbox" />
-        </label>
-        <label>
-          Stage OPC address
-          <input id="config-stage-opc-address" name="configStageOpcAddress" type="text" />
-        </label>
-        <label>
-          Stage brightness
-          <input id="config-stage-brightness" name="configStageBrightness" type="number" min="0" max="1" step="0.01" />
-        </label>
-        <label>
-          Stage side lengths
-          <textarea id="config-stage-side-lengths" className="config-editor" name="configStageSideLengths" rows={3} spellCheck={false} />
-        </label>
+      <fieldset className="config-panel">
+        <legend>Output And Layout</legend>
+        <div className="config-section-grid output-config-grid">
+          <section className="config-card" aria-label="Dome output config">
+            <h3>Dome</h3>
+            <label className="checkbox-field">
+              <input id="config-dome-enabled" name="configDomeEnabled" type="checkbox" />
+              <span>Hardware enabled</span>
+            </label>
+            <label className="checkbox-field">
+              <input id="config-dome-simulation-enabled" name="configDomeSimulationEnabled" type="checkbox" />
+              <span>Simulator enabled</span>
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">OPC address</span>
+              <input id="config-dome-opc-address" name="configDomeOpcAddress" type="text" placeholder="127.0.0.1:7890" />
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Brightness</span>
+              <input id="config-dome-brightness" name="configDomeBrightness" type="number" min="0" max="1" step="0.01" />
+            </label>
+          </section>
+          <section className="config-card" aria-label="Bar output config">
+            <h3>Bar</h3>
+            <label className="checkbox-field">
+              <input id="config-bar-enabled" name="configBarEnabled" type="checkbox" />
+              <span>Hardware enabled</span>
+            </label>
+            <label className="checkbox-field">
+              <input id="config-bar-simulation-enabled" name="configBarSimulationEnabled" type="checkbox" />
+              <span>Simulator enabled</span>
+            </label>
+            <div className="inline-field-grid">
+              <label className="config-field">
+                <span className="config-field-label">Infinity length</span>
+                <input id="config-bar-infinity-length" name="configBarInfinityLength" type="number" min="0" step="1" />
+              </label>
+              <label className="config-field">
+                <span className="config-field-label">Infinity width</span>
+                <input id="config-bar-infinity-width" name="configBarInfinityWidth" type="number" min="0" step="1" />
+              </label>
+              <label className="config-field">
+                <span className="config-field-label">Runner length</span>
+                <input id="config-bar-runner-length" name="configBarRunnerLength" type="number" min="0" step="1" />
+              </label>
+            </div>
+            <label className="config-field">
+              <span className="config-field-label">Brightness</span>
+              <input id="config-bar-brightness" name="configBarBrightness" type="number" min="0" max="1" step="0.01" />
+            </label>
+          </section>
+          <section className="config-card" aria-label="Stage output config">
+            <h3>Stage</h3>
+            <label className="checkbox-field">
+              <input id="config-stage-enabled" name="configStageEnabled" type="checkbox" />
+              <span>Hardware enabled</span>
+            </label>
+            <label className="checkbox-field">
+              <input id="config-stage-simulation-enabled" name="configStageSimulationEnabled" type="checkbox" />
+              <span>Simulator enabled</span>
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">OPC address</span>
+              <input id="config-stage-opc-address" name="configStageOpcAddress" type="text" placeholder="127.0.0.1:7891" />
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Brightness</span>
+              <input id="config-stage-brightness" name="configStageBrightness" type="number" min="0" max="1" step="0.01" />
+            </label>
+            <label className="config-field">
+              <span className="config-field-label">Side lengths</span>
+              <span className="field-hint">Comma-separated pixel counts, one value per stage side.</span>
+              <input id="config-stage-side-lengths" name="configStageSideLengths" type="text" inputMode="numeric" placeholder="60, 60, 60, 60" />
+            </label>
+          </section>
+        </div>
       </fieldset>
-      <div>
+      <div className="config-actions">
         <button id="reload-config" type="button">
           Reload Config
         </button>
         <button id="apply-config" type="button">
-          Apply Config
+          Apply JSON Config
         </button>
         <span id="config-status">not loaded</span>
       </div>
-      <textarea id="config-editor" className="config-editor" spellCheck={false} rows={16} />
+      <label className="config-field json-config-field">
+        <span className="config-field-label">Full JSON config</span>
+        <textarea id="config-editor" className="config-editor" spellCheck={false} rows={16} />
+      </label>
     </details>
   );
 }
