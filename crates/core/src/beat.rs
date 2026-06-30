@@ -108,6 +108,7 @@ impl BeatBroadcaster {
     /// Report an Ableton Link tempo update.
     #[allow(
         clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
         clippy::cast_sign_loss,
         reason = "Link BPM values are positive musical tempos converted to millisecond periods"
     )]
@@ -116,9 +117,9 @@ impl BeatBroadcaster {
             return;
         }
         let beat_ms = (60_000.0 / bpm).round().max(1.0) as u64;
-        let phase_offset_ms = phase
-            .map(|value| (value.rem_euclid(1.0) * beat_ms as f64).round() as u64)
-            .unwrap_or(0);
+        let phase_offset_ms = phase.map_or(0, |value| {
+            (value.rem_euclid(1.0) * beat_ms as f64).round() as u64
+        });
         let anchor_ms = realtime_ms.saturating_sub(phase_offset_ms);
         self.clock = Some(BeatClock::new(beat_ms, anchor_ms));
         self.taps.clear();

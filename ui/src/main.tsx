@@ -372,6 +372,10 @@ function OpcTargetsFooter() {
             <span id="input-midi">disabled</span>
           </p>
           <p className="target-status">
+            <strong>MIDI Levels</strong>
+            <span id="input-midi-levels">none</span>
+          </p>
+          <p className="target-status">
             <strong>Orientation</strong>
             <span id="input-orientation">disabled</span>
           </p>

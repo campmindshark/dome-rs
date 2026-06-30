@@ -53,11 +53,7 @@ const STALE_FIELDS: &[&str] = &[
     "snareT",
 ];
 
-const INERT_FIELDS: &[&str] = &[
-    "domeAutoFlashDelay",
-    "channelToAudioLevelDriverPreset",
-    "channelToMidiLevelDriverPreset",
-];
+const INERT_FIELDS: &[&str] = &["domeAutoFlashDelay"];
 
 const VALID_BINDING_TARGETS: &[&str] = &[
     "domeBrightness",

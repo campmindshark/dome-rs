@@ -13,8 +13,8 @@ use axum::{
     Json, Router,
 };
 use domers_core::{
-    BeatBroadcaster, ColorPalette, DomersConfig, EngineConfig, MidiBindingAction,
-    MidiBindingCommandKind, MidiBindingConfig, PaletteEntry, Rgb, TempoSource,
+    BeatBroadcaster, ColorPalette, DomersConfig, EngineConfig, LevelDriverPresetConfig,
+    MidiBindingAction, MidiBindingCommandKind, MidiBindingConfig, PaletteEntry, Rgb, TempoSource,
 };
 use domers_engine::{schedule_operator_frame, FullVisualizerSpec, InputSpec, OutputSpec};
 use domers_inputs::{
@@ -118,6 +118,8 @@ pub struct InputStatus {
     pub midi_commands: u64,
     /// Recent MIDI command/action log.
     pub midi_log: Vec<MidiLogEntry>,
+    /// Current Spectrum MIDI ADSR level-driver channel values.
+    pub midi_level_driver_channels: Vec<Option<f64>>,
     /// Last recognized orientation datagram kind.
     pub last_orientation: Option<String>,
     /// Active orientation devices.
@@ -623,6 +625,43 @@ impl ServerState {
                 self.config.dome.active_visualizer = index.min(8);
                 format!("visualizer:{}", self.config.dome.active_visualizer)
             }
+            MidiBindingAction::AdsrLevelDriver => self.apply_adsr_level_driver_binding(
+                binding.index,
+                command.index,
+                f64::from(command.value),
+            ),
+        }
+    }
+
+    fn apply_adsr_level_driver_binding(
+        &mut self,
+        range_start: u8,
+        note_index: u8,
+        velocity: f64,
+    ) -> String {
+        let channel_index = note_index.saturating_sub(range_start);
+        if channel_index >= MIDI_LEVEL_DRIVER_CHANNELS_U8 {
+            return "adsr:out_of_range".to_string();
+        }
+        let channel_index = usize::from(channel_index);
+        if self.midi_level_driver_preset(channel_index).is_none() {
+            return format!("adsr:{channel_index}:unassigned");
+        }
+        let now_ms = self.now_ms();
+        if velocity == 0.0 {
+            if let Some(driver) = &mut self.inputs.midi_level_drivers[channel_index] {
+                driver.release_timestamp_ms = Some(now_ms);
+                self.inputs.last_level_driver_interaction_ms = now_ms;
+            }
+            format!("adsr:{channel_index}:release")
+        } else {
+            self.inputs.midi_level_drivers[channel_index] = Some(MidiLevelDriverInstance {
+                press_timestamp_ms: now_ms,
+                press_velocity: velocity.clamp(0.0, 1.0),
+                release_timestamp_ms: None,
+            });
+            self.inputs.last_level_driver_interaction_ms = now_ms;
+            format!("adsr:{channel_index}:press")
         }
     }
 
@@ -760,7 +799,9 @@ impl ServerState {
 
     fn visualizer_controls(&self) -> SimulatorControls {
         let mut controls = self.simulator;
-        if let Some(volume) = self.inputs.volume {
+        if let Some(volume) = self.active_midi_level_driver_volume() {
+            controls.volume = volume;
+        } else if let Some(volume) = self.inputs.volume {
             controls.volume = volume;
         } else if self.running {
             controls.volume = animated_volume(self.now_ms());
@@ -785,6 +826,7 @@ impl ServerState {
             madmom_beats: self.inputs.madmom_beats,
             midi_commands: self.inputs.midi_commands,
             midi_log: self.inputs.midi_log.iter().cloned().collect(),
+            midi_level_driver_channels: self.current_midi_level_driver_values(),
             last_orientation: self.inputs.last_orientation.clone(),
             orientation_devices: self
                 .inputs
@@ -800,6 +842,91 @@ impl ServerState {
             link_adapter: self.inputs.link_adapter.clone(),
         }
     }
+
+    fn current_midi_level_driver_values(&self) -> Vec<Option<f64>> {
+        (0..MIDI_LEVEL_DRIVER_CHANNELS)
+            .map(|channel_index| self.current_midi_level_driver_value(channel_index))
+            .collect()
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "ADSR levels are clamped to the visualizer f32 input range"
+    )]
+    fn active_midi_level_driver_volume(&self) -> Option<f32> {
+        self.current_midi_level_driver_values()
+            .into_iter()
+            .flatten()
+            .reduce(f64::max)
+            .map(|value| value.clamp(0.0, 1.0) as f32)
+    }
+
+    fn midi_level_driver_preset(&self, channel_index: usize) -> Option<&LevelDriverPresetConfig> {
+        let channel = u8::try_from(channel_index).ok()?;
+        let preset_name = self.config.level_drivers.midi_channels.get(&channel)?;
+        let preset = self.config.level_drivers.presets.get(preset_name)?;
+        preset.is_midi().then_some(preset)
+    }
+
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "ADSR envelope durations are millisecond musical values converted to interpolation ratios"
+    )]
+    fn current_midi_level_driver_value(&self, channel_index: usize) -> Option<f64> {
+        let preset = self.midi_level_driver_preset(channel_index)?;
+        let LevelDriverPresetConfig::Midi {
+            attack_time,
+            peak_level,
+            decay_time,
+            sustain_level,
+            release_time,
+        } = preset
+        else {
+            return None;
+        };
+        let driver = self.inputs.midi_level_drivers[channel_index]?;
+        let now = self.now_ms();
+        let current_value = midi_level_without_release(
+            driver,
+            *attack_time,
+            *peak_level,
+            *decay_time,
+            *sustain_level,
+            now,
+        );
+        let Some(release_timestamp_ms) = driver.release_timestamp_ms else {
+            return Some(current_value);
+        };
+        if now < release_timestamp_ms {
+            return Some(current_value);
+        }
+        let time_since_release = now.saturating_sub(release_timestamp_ms);
+        if time_since_release > *release_time {
+            if now
+                > self
+                    .inputs
+                    .last_level_driver_interaction_ms
+                    .saturating_add(5_000)
+            {
+                return None;
+            }
+            return Some(0.0);
+        }
+        if *release_time == 0 {
+            return Some(0.0);
+        }
+        let level_at_release = midi_level_without_release(
+            driver,
+            *attack_time,
+            *peak_level,
+            *decay_time,
+            *sustain_level,
+            release_timestamp_ms,
+        );
+        Some(
+            level_at_release * ((*release_time - time_since_release) as f64) / *release_time as f64,
+        )
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -810,6 +937,8 @@ struct InputRuntime {
     madmom_beats: u64,
     midi_commands: u64,
     midi_log: VecDeque<MidiLogEntry>,
+    midi_level_drivers: [Option<MidiLevelDriverInstance>; MIDI_LEVEL_DRIVER_CHANNELS],
+    last_level_driver_interaction_ms: u64,
     last_orientation: Option<String>,
     orientation: OrientationInputState,
     audio_adapter: InputAdapterStatus,
@@ -817,6 +946,16 @@ struct InputRuntime {
     orientation_adapter: InputAdapterStatus,
     madmom_adapter: InputAdapterStatus,
     link_adapter: InputAdapterStatus,
+}
+
+const MIDI_LEVEL_DRIVER_CHANNELS: usize = 8;
+const MIDI_LEVEL_DRIVER_CHANNELS_U8: u8 = 8;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct MidiLevelDriverInstance {
+    press_timestamp_ms: u64,
+    press_velocity: f64,
+    release_timestamp_ms: Option<u64>,
 }
 
 #[derive(Clone, Copy)]
@@ -829,10 +968,17 @@ enum InputAdapter {
 }
 
 fn midi_binding_matches(binding: &MidiBindingConfig, command: MidiCommand) -> bool {
+    let index_matches = if binding.action == MidiBindingAction::AdsrLevelDriver {
+        matches!(binding.command_kind, MidiBindingCommandKind::Note)
+            && command.index >= binding.index
+            && command.index < binding.index.saturating_add(MIDI_LEVEL_DRIVER_CHANNELS_U8)
+    } else {
+        binding.index == command.index
+    };
     binding
         .device_index
         .map_or(true, |device_index| device_index == command.device_index)
-        && binding.index == command.index
+        && index_matches
         && midi_kind_matches(binding.command_kind, command.kind)
 }
 
@@ -846,6 +992,31 @@ fn midi_kind_matches(binding: MidiBindingCommandKind, command: MidiCommandKind) 
             )
             | (MidiBindingCommandKind::Program, MidiCommandKind::Program)
     )
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "ADSR envelope durations are millisecond musical values converted to interpolation ratios"
+)]
+fn midi_level_without_release(
+    driver: MidiLevelDriverInstance,
+    attack_time: u64,
+    peak_level: f64,
+    decay_time: u64,
+    sustain_level: f64,
+    current_time_ms: u64,
+) -> f64 {
+    let time_since_press = current_time_ms.saturating_sub(driver.press_timestamp_ms);
+    let real_peak = driver.press_velocity * peak_level;
+    if attack_time > 0 && time_since_press < attack_time {
+        return (time_since_press as f64 / attack_time as f64) * real_peak;
+    }
+    let time_since_decay_began = time_since_press.saturating_sub(attack_time);
+    let real_sustain = driver.press_velocity * sustain_level;
+    if decay_time == 0 || time_since_decay_began > decay_time {
+        return real_sustain;
+    }
+    real_peak - time_since_decay_began as f64 / decay_time as f64 * (real_peak - real_sustain)
 }
 
 #[allow(
@@ -2214,8 +2385,9 @@ mod tests {
     };
 
     use domers_core::{
-        AudioDeviceConfig, AudioDeviceFlowConfig, DomersConfig, MidiBindingAction,
-        MidiBindingCommandKind, MidiBindingConfig, PaletteEntry, TempoSource, UdpInputConfig,
+        AudioDeviceConfig, AudioDeviceFlowConfig, DomersConfig, LevelDriverPresetConfig,
+        MidiBindingAction, MidiBindingCommandKind, MidiBindingConfig, PaletteEntry, TempoSource,
+        UdpInputConfig,
     };
     use domers_inputs::{MidiCommand, MidiCommandKind};
     use domers_outputs::DomeCommand;
@@ -2522,6 +2694,57 @@ mod tests {
         assert_eq!(snapshot.inputs.midi_log[0].actions, ["tap_tempo"]);
         assert_eq!(snapshot.inputs.midi_log[1].actions, ["palette:6"]);
         assert_eq!(snapshot.inputs.midi_log[2].actions, ["visualizer:8"]);
+    }
+
+    #[test]
+    fn adsr_midi_binding_drives_level_driver_channels() {
+        let mut config = DomersConfig::default();
+        config.level_drivers.presets.insert(
+            "midi test".to_string(),
+            LevelDriverPresetConfig::Midi {
+                attack_time: 0,
+                peak_level: 1.0,
+                decay_time: 0,
+                sustain_level: 0.75,
+                release_time: 100,
+            },
+        );
+        config
+            .level_drivers
+            .midi_channels
+            .insert(0, "midi test".to_string());
+        config.inputs.midi.bindings = vec![MidiBindingConfig {
+            device_index: None,
+            command_kind: MidiBindingCommandKind::Note,
+            index: 48,
+            action: MidiBindingAction::AdsrLevelDriver,
+            target_index: None,
+        }];
+        let mut state = ServerState::new(config);
+
+        state.apply_midi_commands(&[MidiCommand {
+            device_index: 0,
+            kind: MidiCommandKind::Note,
+            index: 48,
+            value: 0.8,
+        }]);
+        let snapshot = state.snapshot();
+
+        assert_eq!(snapshot.inputs.midi_commands, 1);
+        assert_eq!(snapshot.inputs.midi_log[0].actions, ["adsr:0:press"]);
+        assert!((snapshot.inputs.midi_level_driver_channels[0].unwrap() - 0.6).abs() < 0.000_001);
+        assert!((state.visualizer_controls().volume - 0.6).abs() < 0.000_001);
+
+        state.apply_midi_commands(&[MidiCommand {
+            device_index: 0,
+            kind: MidiCommandKind::Note,
+            index: 48,
+            value: 0.0,
+        }]);
+        let snapshot = state.snapshot();
+
+        assert_eq!(snapshot.inputs.midi_log[1].actions, ["adsr:0:release"]);
+        assert!(snapshot.inputs.midi_level_driver_channels[0].is_some());
     }
 
     #[test]

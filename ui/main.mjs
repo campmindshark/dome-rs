@@ -46,6 +46,7 @@ const paletteGrid = document.querySelector('#palette-grid');
 let paletteControls = [];
 const inputAudio = document.querySelector('#input-audio');
 const inputMidi = document.querySelector('#input-midi');
+const inputMidiLevels = document.querySelector('#input-midi-levels');
 const inputOrientation = document.querySelector('#input-orientation');
 const inputMadmom = document.querySelector('#input-madmom');
 const inputLink = document.querySelector('#input-link');
@@ -389,6 +390,13 @@ function updateInputStatus(inputs) {
   );
   updateInputAdapterStatus(inputMadmom, inputs.madmom_adapter, `${inputs.madmom_beats ?? 0} beats`);
   updateInputAdapterStatus(inputLink, inputs.link_adapter, `${inputs.beat_ms ?? 'n/a'}ms beat`);
+  if (inputMidiLevels) {
+    const levels = inputs.midi_level_driver_channels ?? [];
+    const active = levels
+      .map((value, index) => value === null || value === undefined ? null : `${index}:${Number(value).toFixed(2)}`)
+      .filter(Boolean);
+    inputMidiLevels.textContent = active.length ? active.join(', ') : 'none';
+  }
   updateOrientationDevices(inputs.orientation_devices ?? []);
   updateMidiLog(inputs.midi_log ?? []);
   if (tempoBpm) {

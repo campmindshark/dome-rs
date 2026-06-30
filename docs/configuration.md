@@ -133,6 +133,11 @@ command_kind = "control_change"
 index = 1
 action = "volume"
 
+[[inputs.midi.bindings]]
+command_kind = "note"
+index = 48 # first note in an 8-note ADSR channel range
+action = "adsr_level_driver"
+
 [inputs.orientation]
 bind = "127.0.0.1:5005" # raw Spectrum orientation datagrams
 ```
@@ -148,6 +153,7 @@ Supported MIDI binding actions are:
 - `tap_tempo`: trigger tap tempo when command value is positive.
 - `palette`: set the active palette. Use `target_index` for a fixed palette or omit it to map command value across palettes 0-7.
 - `visualizer`: set the active dome visualizer. Use `target_index` for a fixed visualizer or omit it to map command value across visualizers 0-8.
+- `adsr_level_driver`: treat `index` as the first note in an 8-note Spectrum ADSR range. Positive note velocity presses the channel; zero velocity releases it.
 
 UDP audio and MIDI remain useful bridge transports, but they are not the full
 native-device scope. macOS/Linux native audio and MIDI capture are parity work;
@@ -157,6 +163,37 @@ device identity/index semantics are already represented in config and tests.
 enumeration rule: all active endpoints receive an index, but only capture
 devices are selectable. If `madmom.audio_input_index` is unset, `domers run`
 derives the Madmom/PortAudio index from `inputs.audio.device_id`.
+
+## Level Drivers
+
+Spectrum level-driver presets import into `[level_drivers]`. MIDI ADSR presets
+drive eight channel envelopes and can temporarily override visualizer volume.
+After the release envelope and Spectrum's 5-second idle window, control returns
+to audio volume.
+
+```toml
+[level_drivers.presets."midi test"]
+source = "midi"
+attack_time = 10
+peak_level = 1.0
+decay_time = 20
+sustain_level = 0.8
+release_time = 10
+
+[level_drivers.presets."full spectrum"]
+source = "audio"
+filter_range_start = 0.0
+filter_range_end = 1.0
+
+[level_drivers.midi_channels]
+0 = "midi test"
+
+[level_drivers.audio_channels]
+0 = "full spectrum"
+```
+
+Audio presets and channel assignments are preserved for native spectral capture;
+UDP volume samples remain a whole-signal fallback until native capture is enabled.
 
 ## Import Existing Spectrum XML
 

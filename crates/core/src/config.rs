@@ -51,6 +51,9 @@ pub struct DomersConfig {
     /// Ableton Link / Carabiner-compatible sidecar config.
     #[serde(default)]
     pub carabiner: CarabinerConfig,
+    /// Spectrum level-driver presets and channel assignments.
+    #[serde(default)]
+    pub level_drivers: LevelDriverConfig,
 }
 
 /// Dome fixture config.
@@ -206,6 +209,8 @@ pub enum MidiBindingAction {
     Palette,
     /// Select dome visualizer. Uses `target_index` if present, otherwise maps value to 0-8.
     Visualizer,
+    /// Trigger Spectrum ADSR MIDI level-driver channels. `index` is the first note in an 8-note range.
+    AdsrLevelDriver,
 }
 
 /// One MIDI command binding.
@@ -242,6 +247,13 @@ impl Default for MidiInputConfig {
                     command_kind: MidiBindingCommandKind::ControlChange,
                     index: 1,
                     action: MidiBindingAction::Volume,
+                    target_index: None,
+                },
+                MidiBindingConfig {
+                    device_index: None,
+                    command_kind: MidiBindingCommandKind::Note,
+                    index: 48,
+                    action: MidiBindingAction::AdsrLevelDriver,
                     target_index: None,
                 },
             ],
@@ -297,6 +309,54 @@ impl Default for CarabinerConfig {
             human_link_output: false,
             madmom_link_output: false,
         }
+    }
+}
+
+/// Spectrum level-driver presets and channel assignments.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct LevelDriverConfig {
+    /// Named audio/MIDI level-driver presets.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub presets: BTreeMap<String, LevelDriverPresetConfig>,
+    /// Mapping from channel index to an audio preset name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub audio_channels: BTreeMap<u8, String>,
+    /// Mapping from channel index to a MIDI ADSR preset name.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub midi_channels: BTreeMap<u8, String>,
+}
+
+/// One Spectrum level-driver preset.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "source", rename_all = "snake_case")]
+pub enum LevelDriverPresetConfig {
+    /// Audio band level-driver preset.
+    Audio {
+        /// Normalized filter range start.
+        filter_range_start: f64,
+        /// Normalized filter range end.
+        filter_range_end: f64,
+    },
+    /// MIDI ADSR envelope level-driver preset.
+    Midi {
+        /// Attack duration in milliseconds.
+        attack_time: u64,
+        /// Peak level multiplier.
+        peak_level: f64,
+        /// Decay duration in milliseconds.
+        decay_time: u64,
+        /// Sustain level multiplier.
+        sustain_level: f64,
+        /// Release duration in milliseconds.
+        release_time: u64,
+    },
+}
+
+impl LevelDriverPresetConfig {
+    /// Whether this preset is a MIDI ADSR preset.
+    #[must_use]
+    pub fn is_midi(&self) -> bool {
+        matches!(self, Self::Midi { .. })
     }
 }
 
@@ -364,6 +424,7 @@ impl Default for DomersConfig {
                 audio_input_index: None,
             },
             carabiner: CarabinerConfig::default(),
+            level_drivers: LevelDriverConfig::default(),
         }
     }
 }
@@ -417,6 +478,8 @@ struct DomersConfigToml {
     madmom: MadmomConfig,
     #[serde(default)]
     carabiner: CarabinerConfig,
+    #[serde(default)]
+    level_drivers: LevelDriverConfig,
 }
 
 impl From<DomersConfigToml> for DomersConfig {
@@ -431,6 +494,7 @@ impl From<DomersConfigToml> for DomersConfig {
             color_palette_index: config.color_palette_index,
             madmom: config.madmom,
             carabiner: config.carabiner,
+            level_drivers: config.level_drivers,
         }
     }
 }
@@ -491,6 +555,7 @@ struct DomersConfigTomlOut {
     color_palette: ColorPaletteDryToml,
     madmom: MadmomConfig,
     carabiner: CarabinerConfig,
+    level_drivers: LevelDriverConfig,
 }
 
 impl From<&DomersConfig> for DomersConfigTomlOut {
@@ -505,6 +570,7 @@ impl From<&DomersConfig> for DomersConfigTomlOut {
             color_palette: ColorPaletteDryToml::from(&config.color_palette),
             madmom: config.madmom.clone(),
             carabiner: config.carabiner.clone(),
+            level_drivers: config.level_drivers.clone(),
         }
     }
 }
@@ -590,6 +656,20 @@ pub fn import_spectrum_xml(xml: &str) -> ImportedConfig {
         bool_tag(xml, "madmomLinkOutput").unwrap_or(config.carabiner.madmom_link_output);
     config.tempo.flash_speed = f64_tag(xml, "flashSpeed").unwrap_or(config.tempo.flash_speed);
     config.inputs.audio.device_id = tag_value(xml, "audioDeviceID").map(str::to_string);
+    config.level_drivers = level_driver_config(xml);
+    if let Some(index) = adsr_binding_index(xml) {
+        if !config.inputs.midi.bindings.iter().any(|binding| {
+            binding.action == MidiBindingAction::AdsrLevelDriver && binding.index == index
+        }) {
+            config.inputs.midi.bindings.push(MidiBindingConfig {
+                device_index: None,
+                command_kind: MidiBindingCommandKind::Note,
+                index,
+                action: MidiBindingAction::AdsrLevelDriver,
+                target_index: None,
+            });
+        }
+    }
     config.color_palette = color_palette(xml);
     config.color_palette_index =
         u8_tag(xml, "colorPaletteIndex").unwrap_or(config.color_palette_index);
@@ -620,6 +700,13 @@ fn string_tag(xml: &str, tag: &str) -> Option<String> {
     tag_value(xml, tag).map(ToString::to_string)
 }
 
+fn loose_tag_value<'a>(xml: &'a str, tag: &str) -> Option<&'a str> {
+    let start = xml.find(&format!("<{tag}"))?;
+    let value_start = xml[start..].find('>')? + start + 1;
+    let end = xml[value_start..].find(&format!("</{tag}>"))? + value_start;
+    Some(xml[value_start..end].trim())
+}
+
 fn bool_tag(xml: &str, tag: &str) -> Option<bool> {
     tag_value(xml, tag)?.parse().ok()
 }
@@ -632,8 +719,77 @@ fn u32_tag(xml: &str, tag: &str) -> Option<u32> {
     tag_value(xml, tag)?.parse().ok()
 }
 
+fn u64_tag(xml: &str, tag: &str) -> Option<u64> {
+    tag_value(xml, tag)?.parse().ok()
+}
+
 fn f64_tag(xml: &str, tag: &str) -> Option<f64> {
     tag_value(xml, tag)?.parse().ok()
+}
+
+fn adsr_binding_index(xml: &str) -> Option<u8> {
+    let marker = r#"xsi:type="AdsrLevelDriverMidiBindingConfig""#;
+    let block = xml.split(marker).nth(1)?;
+    u8_tag(block, "indexRangeStart")
+}
+
+fn level_driver_config(xml: &str) -> LevelDriverConfig {
+    let mut config = LevelDriverConfig::default();
+    if let Some(block) = tag_value(xml, "levelDriverPresets") {
+        for item in xml_items(block) {
+            let Some(name) = tag_value(item, "Key") else {
+                continue;
+            };
+            let Some(value) = loose_tag_value(item, "Value") else {
+                continue;
+            };
+            if item.contains(r#"xsi:type="AudioLevelDriverPreset""#) {
+                config.presets.insert(
+                    name.to_string(),
+                    LevelDriverPresetConfig::Audio {
+                        filter_range_start: f64_tag(value, "FilterRangeStart").unwrap_or(0.0),
+                        filter_range_end: f64_tag(value, "FilterRangeEnd").unwrap_or(1.0),
+                    },
+                );
+            } else if item.contains(r#"xsi:type="MidiLevelDriverPreset""#) {
+                config.presets.insert(
+                    name.to_string(),
+                    LevelDriverPresetConfig::Midi {
+                        attack_time: u64_tag(value, "AttackTime").unwrap_or(0),
+                        peak_level: f64_tag(value, "PeakLevel").unwrap_or(1.0),
+                        decay_time: u64_tag(value, "DecayTime").unwrap_or(0),
+                        sustain_level: f64_tag(value, "SustainLevel").unwrap_or(1.0),
+                        release_time: u64_tag(value, "ReleaseTime").unwrap_or(0),
+                    },
+                );
+            }
+        }
+    }
+    config.audio_channels = channel_preset_map(xml, "channelToAudioLevelDriverPreset");
+    config.midi_channels = channel_preset_map(xml, "channelToMidiLevelDriverPreset");
+    config
+}
+
+fn channel_preset_map(xml: &str, tag: &str) -> BTreeMap<u8, String> {
+    let mut map = BTreeMap::new();
+    if let Some(block) = tag_value(xml, tag) {
+        for item in xml_items(block) {
+            let Some(channel) = u8_tag(item, "Key") else {
+                continue;
+            };
+            if let Some(preset) = tag_value(item, "Value") {
+                map.insert(channel, preset.to_string());
+            }
+        }
+    }
+    map
+}
+
+fn xml_items(block: &str) -> impl Iterator<Item = &str> {
+    block
+        .split("<Item>")
+        .skip(1)
+        .filter_map(|chunk| chunk.split("</Item>").next())
 }
 
 fn stage_side_lengths(xml: &str) -> Vec<u32> {
@@ -676,7 +832,9 @@ fn color_palette(xml: &str) -> ColorPalette {
 mod tests {
     use crate::color::{ColorPalette, PaletteEntry};
 
-    use super::{import_spectrum_xml, DomersConfig, TempoSource};
+    use super::{
+        import_spectrum_xml, DomersConfig, LevelDriverPresetConfig, MidiBindingAction, TempoSource,
+    };
 
     #[test]
     fn default_config_fixture_contains_core_fields() {
@@ -707,6 +865,39 @@ mod tests {
         );
         assert_eq!(imported.config.color_palette_index, 7);
         assert_eq!(imported.config.color_palette.colors.len(), 64);
+        assert_eq!(imported.config.level_drivers.presets.len(), 4);
+        assert_eq!(
+            imported
+                .config
+                .level_drivers
+                .audio_channels
+                .get(&0)
+                .map(String::as_str),
+            Some("full spectrum")
+        );
+        assert_eq!(
+            imported
+                .config
+                .level_drivers
+                .midi_channels
+                .get(&0)
+                .map(String::as_str),
+            Some("midi test")
+        );
+        assert!(matches!(
+            imported.config.level_drivers.presets.get("midi test"),
+            Some(LevelDriverPresetConfig::Midi {
+                attack_time: 10,
+                peak_level,
+                decay_time: 20,
+                sustain_level,
+                release_time: 10,
+            }) if (*peak_level - 1.0).abs() < f64::EPSILON
+                && (*sustain_level - 0.8).abs() < f64::EPSILON
+        ));
+        assert!(imported.config.inputs.midi.bindings.iter().any(|binding| {
+            binding.action == MidiBindingAction::AdsrLevelDriver && binding.index == 48
+        }));
         assert_eq!(
             imported.config.color_palette.colors[0],
             PaletteEntry::gradient(0xff_00_00, 0xff_00_00)

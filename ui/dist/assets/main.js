@@ -7574,6 +7574,11 @@ function updateInputStatus(inputs) {
   );
   updateInputAdapterStatus(inputMadmom, inputs.madmom_adapter, `${inputs.madmom_beats ?? 0} beats`);
   updateInputAdapterStatus(inputLink, inputs.link_adapter, `${inputs.beat_ms ?? "n/a"}ms beat`);
+  if (inputMidiLevels) {
+    const levels = inputs.midi_level_driver_channels ?? [];
+    const active = levels.map((value, index) => value === null || value === void 0 ? null : `${index}:${Number(value).toFixed(2)}`).filter(Boolean);
+    inputMidiLevels.textContent = active.length ? active.join(", ") : "none";
+  }
   updateOrientationDevices(inputs.orientation_devices ?? []);
   updateMidiLog(inputs.midi_log ?? []);
   if (tempoBpm) {
@@ -8026,7 +8031,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioDeviceId, configMidiBind, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightness, configStageSideLengths, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, previewDrawer, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, simulatorStarted, simulatorSocket;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioDeviceId, configMidiBind, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightness, configStageSideLengths, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, previewDrawer, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, simulatorStarted, simulatorSocket;
 var init_main = __esm({
   async "domers/ui/main.mjs"() {
     "use strict";
@@ -8078,6 +8083,7 @@ var init_main = __esm({
     paletteControls = [];
     inputAudio = document.querySelector("#input-audio");
     inputMidi = document.querySelector("#input-midi");
+    inputMidiLevels = document.querySelector("#input-midi-levels");
     inputOrientation = document.querySelector("#input-orientation");
     inputMadmom = document.querySelector("#input-madmom");
     inputLink = document.querySelector("#input-link");
@@ -8521,6 +8527,10 @@ function OpcTargetsFooter() {
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "MIDI" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-midi", children: "disabled" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "MIDI Levels" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { id: "input-midi-levels", children: "none" })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "target-status", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Orientation" }),

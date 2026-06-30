@@ -9,8 +9,8 @@ pub use beat::{BeatBroadcaster, BeatClock};
 pub use color::{ColorPalette, PaletteEntry, Rgb};
 pub use config::{
     import_spectrum_xml, AudioDeviceConfig, AudioDeviceFlowConfig, AudioInputConfig,
-    CarabinerConfig, DomersConfig, EngineConfig, ImportedConfig, InputConfig, MadmomConfig,
-    MidiBindingAction, MidiBindingCommandKind, MidiBindingConfig, MidiInputConfig, TempoSource,
-    UdpInputConfig,
+    CarabinerConfig, DomersConfig, EngineConfig, ImportedConfig, InputConfig, LevelDriverConfig,
+    LevelDriverPresetConfig, MadmomConfig, MidiBindingAction, MidiBindingCommandKind,
+    MidiBindingConfig, MidiInputConfig, TempoSource, UdpInputConfig,
 };
 pub use migration::{analyze_spectrum_xml, MigrationReport, WarningKind};

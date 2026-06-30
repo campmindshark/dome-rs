@@ -102,6 +102,7 @@ for (const marker of [
   'id="orientation-calibrate"',
   'id="input-audio"',
   'id="input-midi"',
+  'id="input-midi-levels"',
   'id="input-orientation"',
   'id="input-madmom"',
   'id="input-link"',

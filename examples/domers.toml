@@ -91,6 +91,11 @@ command_kind = "control_change"
 index = 1
 action = "volume"
 
+[[inputs.midi.bindings]]
+command_kind = "note"
+index = 48
+action = "adsr_level_driver"
+
 [inputs.orientation]
 
 [color_palette]
@@ -394,3 +399,39 @@ color2_enabled = true
 
 [madmom]
 command = "DBNBeatTracker"
+
+[carabiner]
+command = "carabiner"
+human_link_output = false
+madmom_link_output = false
+
+[level_drivers.presets."10% bass"]
+source = "audio"
+filter_range_start = 0.0
+filter_range_end = 0.2
+
+[level_drivers.presets."90% treble"]
+source = "audio"
+filter_range_start = 0.1
+filter_range_end = 1.0
+
+[level_drivers.presets."full spectrum"]
+source = "audio"
+filter_range_start = 0.0
+filter_range_end = 1.0
+
+[level_drivers.presets."midi test"]
+source = "midi"
+attack_time = 10
+peak_level = 1.0
+decay_time = 20
+sustain_level = 0.8
+release_time = 10
+
+[level_drivers.audio_channels]
+0 = "full spectrum"
+1 = "full spectrum"
+2 = "full spectrum"
+
+[level_drivers.midi_channels]
+0 = "midi test"
