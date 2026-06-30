@@ -319,4 +319,13 @@ mod tests {
         let parsed = DomersConfig::from_toml_str(&toml).expect("config parses");
         assert_eq!(parsed.dome.active_visualizer, config.dome.active_visualizer);
     }
+
+    #[test]
+    fn example_config_parses() {
+        let toml = include_str!("../../../examples/domers.toml");
+        let parsed = DomersConfig::from_toml_str(toml).expect("example config parses");
+
+        assert!(parsed.dome.simulation_enabled);
+        assert_eq!(parsed.madmom.command, "DBNBeatTracker");
+    }
 }

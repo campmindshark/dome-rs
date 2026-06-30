@@ -9,6 +9,12 @@ Intentional differences from Spectrum runtime config are tracked in
 
 A Domers config is organized into fixture and subsystem sections:
 
+Use `examples/domers.toml` as the checked starter config:
+
+```sh
+cp examples/domers.toml domers.toml
+```
+
 ```toml
 [dome]
 enabled = true

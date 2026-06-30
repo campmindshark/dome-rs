@@ -12,6 +12,7 @@ const required = [
   '../docs/porting-inventory.md',
   '../docs/testing.md',
   '../docs/ui-expectations.md',
+  '../examples/domers.toml',
   './index.html',
   './main.mjs',
 ];

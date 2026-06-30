@@ -22,7 +22,13 @@ node ui/check.mjs
 
 ## Configuration
 
-Domers uses TOML for native configuration. Spectrum XML is supported only as a legacy import source:
+Domers uses TOML for native configuration. Start from the checked example:
+
+```sh
+cp examples/domers.toml domers.toml
+```
+
+Spectrum XML is supported only as a legacy import source:
 
 ```sh
 cargo run --bin domers-config -- import-spectrum-xml \

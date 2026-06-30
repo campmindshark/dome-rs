@@ -23,6 +23,17 @@ Browser UI -> Server contract -> Engine scheduler -> Inputs + Visualizers -> Out
 
 The browser simulator is driven by engine frame data. It does not read back from OPC hardware sockets.
 
+## Current Implementation Status
+
+The current server crate implements an in-process `ServerState` contract for health, start/stop, config patching, metrics, and deterministic simulator frames. The browser shell is static and smoke-tested.
+
+Still needed for a usable operator app:
+
+- an HTTP API adapter around `ServerState`
+- a WebSocket stream for simulator frames and metrics
+- browser wiring from the UI controls to those API/WebSocket endpoints
+- the long-running engine loop that applies the timing contracts below
+
 ## Timing Contracts
 
 - Engine target: 400 Hz compute cap.
@@ -68,6 +79,6 @@ TODO: Add architecture diagram image.
 
 TODO: Add screenshot of server metrics once the HTTP/WebSocket adapter exists.
 
-- Capture: browser/devtool/API output showing frame counters and simulator frame counters.
+- Capture: browser/devtool/API output showing frame counters and simulator frame counters after the network adapter is wired.
 - Expected: `frames` and `simulator_frames` are visible.
 - Suggested file: `docs/images/architecture-server-metrics.png`.

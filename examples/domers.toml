@@ -1,0 +1,32 @@
+[dome]
+enabled = false
+simulation_enabled = true
+opc_address = "127.0.0.1:7890"
+active_visualizer = 0
+test_pattern = 0
+brightness = 1.0
+
+[bar]
+enabled = false
+simulation_enabled = false
+infinity_width = 50
+infinity_length = 50
+runner_length = 50
+brightness = 1.0
+test_pattern = 0
+
+[stage]
+enabled = false
+simulation_enabled = false
+opc_address = "127.0.0.1:7890"
+side_lengths = []
+brightness = 1.0
+test_pattern = 0
+
+[tempo]
+source = "human"
+flash_speed = 0.0
+
+[madmom]
+command = "DBNBeatTracker"
+audio_input_index = 0
