@@ -66,6 +66,9 @@ main[data-domers-app] {
 .operator-tab-panel {
   min-height: 0;
 }
+.operator-tab-panel[hidden] {
+  display: none !important;
+}
 .runtime-panel-grid {
   display: grid;
   gap: 1rem;
