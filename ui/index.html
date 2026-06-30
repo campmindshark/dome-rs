@@ -113,24 +113,7 @@
       </section>
       <details id="preview-drawer">
         <summary>Preview</summary>
-        <p>This preview connects to the simulator at <a href="/simulator">/simulator</a> and displays its frame data.</p>
-        <section aria-label="Simulator Preview Inputs">
-          <p>Volume and beat can be set until the matching runtime sources are connected.</p>
-          <label>
-            Audio volume preview
-            <input id="sim-volume" name="simVolume" type="range" min="0" max="1" step="0.01" value="0.7" />
-            <output id="sim-volume-value" for="sim-volume">0.7</output>
-          </label>
-          <label>
-            Beat phase preview
-            <input id="sim-beat-progress" name="simBeatProgress" type="range" min="0" max="1" step="0.01" value="0.25" />
-            <output id="sim-beat-progress-value" for="sim-beat-progress">0.25</output>
-          </label>
-          <label>
-            <input id="sim-flash-active" name="simFlashActive" type="checkbox" />
-            Flash overlay active preview
-          </label>
-        </section>
+        <p>This preview mirrors the live runtime frame stream used for hardware output. Open the independent sandbox at <a href="/simulator">/simulator</a>.</p>
         <section aria-label="Metrics">
           <span id="stream-status">stream disconnected</span>
           <p>Engine frames: <span id="metric-frames" class="metric">0</span></p>

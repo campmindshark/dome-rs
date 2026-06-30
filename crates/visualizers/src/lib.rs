@@ -410,30 +410,117 @@ fn stage_flash_colors(input: DiagnosticInput, side_lengths: &[usize]) -> Vec<Sta
 fn stage_depth_level(input: DiagnosticInput, side_lengths: &[usize]) -> Vec<StageCommand> {
     let mut commands = Vec::new();
     let colors = diagnostic_colors(input.brightness);
-    for (side_index, side_length) in side_lengths.iter().copied().enumerate() {
-        let triangle = side_index / 3;
-        let phase = ((triangle as f64 / 16.0) + input.beat_progress).fract();
-        let second_part = if (side_index / 12) == 1 {
-            ((side_index / 3) % 4) == 2
-        } else {
-            ((side_index / 3) % 4) == 1
-        } ^ (input.beat_progress > 0.5);
-        let base = if second_part { colors[1] } else { colors[0] }.scale(input.volume);
-        for layer_index in 0..STAGE_LAYERS {
+    let triangles = side_lengths.len() / 3;
+    for triangle_index in 0..triangles {
+        let tracer_index =
+            stage_tracer_led_index(side_lengths, triangle_index, input.beat_progress);
+        let max_triangle_counter = triangle_length(side_lengths, triangle_index);
+        let mut triangle_counter = 0;
+        for side_offset in 0..3 {
+            let side_index = triangle_index * 3 + side_offset;
+            let side_length = side_lengths[side_index];
             for led_index in 0..side_length {
-                let distance = ((led_index as f64 / side_length.max(1) as f64) - phase).abs();
-                let color = base.scale((1.0 - distance.min(1.0)) as f32);
-                commands.push(StageCommand::Pixel {
-                    side_index,
-                    led_index,
-                    layer_index,
-                    color,
-                });
+                let second_part = stage_second_part(side_index) ^ (input.beat_progress > 0.5);
+                let base = if second_part { colors[1] } else { colors[0] };
+                let color = stage_depth_color(
+                    base,
+                    colors[2],
+                    triangle_counter,
+                    max_triangle_counter,
+                    tracer_index,
+                    input.volume,
+                );
+                for layer_index in 0..STAGE_LAYERS {
+                    commands.push(StageCommand::Pixel {
+                        side_index,
+                        led_index,
+                        layer_index,
+                        color,
+                    });
+                }
+                triangle_counter += 1;
             }
         }
     }
     commands.push(StageCommand::Flush);
     commands
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "Stage tracer math mirrors Spectrum's double-to-int LED index calculation"
+)]
+fn stage_tracer_led_index(
+    side_lengths: &[usize],
+    triangle_index: usize,
+    beat_progress: f64,
+) -> usize {
+    let progress = (beat_progress.fract() * 3.0).clamp(0.0, 2.999_999);
+    let base = triangle_index * 3;
+    if progress < 1.0 {
+        (progress * side_lengths[base] as f64) as usize
+    } else if progress < 2.0 {
+        side_lengths[base] + ((progress - 1.0) * side_lengths[base + 1] as f64) as usize
+    } else {
+        side_lengths[base]
+            + side_lengths[base + 1]
+            + ((progress - 2.0) * side_lengths[base + 2] as f64) as usize
+    }
+}
+
+fn triangle_length(side_lengths: &[usize], triangle_index: usize) -> usize {
+    side_lengths[triangle_index * 3..triangle_index * 3 + 3]
+        .iter()
+        .sum()
+}
+
+fn stage_second_part(side_index: usize) -> bool {
+    if (side_index / 12) == 1 {
+        ((side_index / 3) % 4) == 2
+    } else {
+        ((side_index / 3) % 4) == 1
+    }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    reason = "Visualizer color focus uses normalized LED counters before RGB scaling"
+)]
+fn stage_depth_color(
+    base: Rgb,
+    tracer: Rgb,
+    triangle_counter: usize,
+    max_triangle_counter: usize,
+    tracer_index: usize,
+    volume: f32,
+) -> Rgb {
+    let pixel_pos = triangle_counter as f64 / max_triangle_counter.max(1) as f64;
+    let focus_pos = tracer_index as f64 / max_triangle_counter.max(1) as f64;
+    let distance = (pixel_pos - focus_pos).abs().clamp(0.0, 1.0);
+    blend(base, tracer, 1.0 - distance).scale(volume)
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "RGB blend clamps normalized channels before conversion"
+)]
+fn blend(a: Rgb, b: Rgb, amount_b: f64) -> Rgb {
+    let amount_b = amount_b.clamp(0.0, 1.0);
+    let amount_a = 1.0 - amount_b;
+    let channel = |left: u8, right: u8| {
+        (f64::from(left) * amount_a + f64::from(right) * amount_b)
+            .round()
+            .clamp(0.0, 255.0) as u8
+    };
+    Rgb {
+        r: channel(a.r, b.r),
+        g: channel(a.g, b.g),
+        b: channel(a.b, b.b),
+    }
 }
 
 fn diagnostic_colors(brightness: f32) -> [Rgb; 6] {
@@ -761,5 +848,51 @@ mod tests {
                 .iter()
                 .any(|command| matches!(command, domers_outputs::StageCommand::Flush)));
         }
+    }
+
+    #[test]
+    fn stage_tracer_index_matches_spectrum_side_progression() {
+        let side_lengths = [10, 20, 30];
+
+        assert_eq!(super::stage_tracer_led_index(&side_lengths, 0, 0.0), 0);
+        assert_eq!(super::stage_tracer_led_index(&side_lengths, 0, 0.25), 7);
+        assert_eq!(super::stage_tracer_led_index(&side_lengths, 0, 0.5), 20);
+        assert_eq!(super::stage_tracer_led_index(&side_lengths, 0, 0.75), 37);
+    }
+
+    #[test]
+    fn stage_depth_level_focuses_color_around_tracer_led() {
+        let commands = render_stage_visualizer(
+            StageVisualizer::DepthLevel,
+            DiagnosticInput {
+                beat_progress: 0.0,
+                volume: 1.0,
+                ..DiagnosticInput::default()
+            },
+            &[10, 20, 30],
+        );
+
+        let focused = commands.iter().find_map(|command| match command {
+            domers_outputs::StageCommand::Pixel {
+                side_index: 0,
+                led_index: 0,
+                layer_index: 0,
+                color,
+            } => Some(*color),
+            _ => None,
+        });
+        let distant = commands.iter().find_map(|command| match command {
+            domers_outputs::StageCommand::Pixel {
+                side_index: 2,
+                led_index: 29,
+                layer_index: 0,
+                color,
+            } => Some(*color),
+            _ => None,
+        });
+
+        assert!(
+            focused.expect("focused pixel exists").b > distant.expect("distant pixel exists").b
+        );
     }
 }
