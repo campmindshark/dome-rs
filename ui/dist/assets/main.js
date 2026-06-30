@@ -7401,6 +7401,7 @@ function updateStructuredConfigFields(config) {
   if (configStageSideLengths) {
     configStageSideLengths.value = (config.stage?.side_lengths ?? []).join(", ");
   }
+  renderStageSideLengthEditor(config.stage?.side_lengths ?? []);
 }
 function readConfigEditor() {
   if (!configEditor) {
@@ -7438,6 +7439,62 @@ function parseIntegerList(value, fallback) {
     return fallback;
   }
   return parsed;
+}
+function renderStageSideLengthEditor(lengths) {
+  const normalized = Array.isArray(lengths) ? lengths.filter((item) => Number.isInteger(item) && item >= 0) : [];
+  if (configStageSideLengths) {
+    configStageSideLengths.value = normalized.join(", ");
+  }
+  updateStageSideLengthSummary(normalized);
+  if (!configStageSideLengthsGrid) {
+    return;
+  }
+  configStageSideLengthsGrid.textContent = "";
+  normalized.forEach((length, index) => {
+    const field = document.createElement("label");
+    field.className = "stage-side-length-field";
+    const label = document.createElement("span");
+    label.textContent = `Side ${index + 1}`;
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.step = "1";
+    input.inputMode = "numeric";
+    input.value = String(length);
+    input.dataset.sideIndex = String(index);
+    input.setAttribute("aria-label", `Stage side ${index + 1} length`);
+    input.addEventListener("input", () => {
+      const values = readStageSideLengthGrid(normalized);
+      if (configStageSideLengths) {
+        configStageSideLengths.value = values.join(", ");
+      }
+      updateStageSideLengthSummary(values);
+    });
+    field.append(label, input);
+    configStageSideLengthsGrid.append(field);
+  });
+}
+function readStageSideLengthGrid(fallback) {
+  if (!configStageSideLengthsGrid) {
+    return parseIntegerList(configStageSideLengths?.value ?? "", fallback);
+  }
+  const inputs = Array.from(configStageSideLengthsGrid.querySelectorAll("input"));
+  if (!inputs.length) {
+    return fallback;
+  }
+  const values = inputs.map((input) => Number(input.value));
+  return values.every((value) => Number.isInteger(value) && value >= 0) ? values : fallback;
+}
+function updateStageSideLengthSummary(lengths) {
+  if (!configStageSideLengthsSummary) {
+    return;
+  }
+  if (!lengths.length) {
+    configStageSideLengthsSummary.textContent = "no sides configured";
+    return;
+  }
+  const total = lengths.reduce((sum, value) => sum + value, 0);
+  configStageSideLengthsSummary.textContent = `${lengths.length} sides \u2022 ${total} pixels total \u2022 min ${Math.min(...lengths)} \u2022 max ${Math.max(...lengths)}`;
 }
 function updateConfigFromStructuredFields() {
   const config = readConfigEditor();
@@ -7483,7 +7540,7 @@ function updateConfigFromStructuredFields() {
   config.stage.simulation_enabled = Boolean(configStageSimulationEnabled?.checked);
   config.stage.opc_address = configStageOpcAddress?.value?.trim() ?? "";
   config.stage.brightness = numberOrFallback(configStageBrightness?.value ?? "", config.stage.brightness ?? 0);
-  config.stage.side_lengths = parseIntegerList(configStageSideLengths?.value ?? "", config.stage.side_lengths ?? []);
+  config.stage.side_lengths = readStageSideLengthGrid(config.stage.side_lengths ?? []);
   configEditor.value = JSON.stringify(config, null, 2);
   updateStructuredConfigFields(config);
 }
@@ -8043,7 +8100,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightness, configStageSideLengths, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, previewDrawer, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, simulatorStarted, simulatorSocket;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, previewDrawer, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, simulatorStarted, simulatorSocket;
 var init_main = __esm({
   async "domers/ui/main.mjs"() {
     "use strict";
@@ -8088,6 +8145,8 @@ var init_main = __esm({
     configStageOpcAddress = document.querySelector("#config-stage-opc-address");
     configStageBrightness = document.querySelector("#config-stage-brightness");
     configStageSideLengths = document.querySelector("#config-stage-side-lengths");
+    configStageSideLengthsSummary = document.querySelector("#config-stage-side-lengths-summary");
+    configStageSideLengthsGrid = document.querySelector("#config-stage-side-lengths-grid");
     simVolume = document.querySelector("#sim-volume");
     simVolumeValue = document.querySelector("#sim-volume-value");
     simBeatProgress = document.querySelector("#sim-beat-progress");
@@ -8399,10 +8458,12 @@ function ConfigEditor() {
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Brightness" }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-brightness", name: "configStageBrightness", type: "number", min: "0", max: "1", step: "0.01" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "config-field", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "config-field stage-side-lengths-editor", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "config-field-label", children: "Side lengths" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "Comma-separated pixel counts, one value per stage side." }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-side-lengths", name: "configStageSideLengths", type: "text", inputMode: "numeric", placeholder: "60, 60, 60, 60" })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "field-hint", children: "One numeric input per stage side. Values update the full config JSON when you apply structured config." }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "config-stage-side-lengths", name: "configStageSideLengths", type: "hidden" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { id: "config-stage-side-lengths-summary", className: "side-lengths-summary", children: "no sides configured" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { id: "config-stage-side-lengths-grid", className: "side-lengths-grid", "aria-label": "Stage side lengths" })
           ] })
         ] })
       ] })

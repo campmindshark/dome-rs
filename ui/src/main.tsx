@@ -192,11 +192,13 @@ function ConfigEditor() {
               <span className="config-field-label">Brightness</span>
               <input id="config-stage-brightness" name="configStageBrightness" type="number" min="0" max="1" step="0.01" />
             </label>
-            <label className="config-field">
+            <div className="config-field stage-side-lengths-editor">
               <span className="config-field-label">Side lengths</span>
-              <span className="field-hint">Comma-separated pixel counts, one value per stage side.</span>
-              <input id="config-stage-side-lengths" name="configStageSideLengths" type="text" inputMode="numeric" placeholder="60, 60, 60, 60" />
-            </label>
+              <span className="field-hint">One numeric input per stage side. Values update the full config JSON when you apply structured config.</span>
+              <input id="config-stage-side-lengths" name="configStageSideLengths" type="hidden" />
+              <p id="config-stage-side-lengths-summary" className="side-lengths-summary">no sides configured</p>
+              <div id="config-stage-side-lengths-grid" className="side-lengths-grid" aria-label="Stage side lengths" />
+            </div>
           </section>
         </div>
       </fieldset>

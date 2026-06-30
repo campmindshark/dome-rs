@@ -39,6 +39,8 @@ const configStageSimulationEnabled = document.querySelector('#config-stage-simul
 const configStageOpcAddress = document.querySelector('#config-stage-opc-address');
 const configStageBrightness = document.querySelector('#config-stage-brightness');
 const configStageSideLengths = document.querySelector('#config-stage-side-lengths');
+const configStageSideLengthsSummary = document.querySelector('#config-stage-side-lengths-summary');
+const configStageSideLengthsGrid = document.querySelector('#config-stage-side-lengths-grid');
 const simVolume = document.querySelector('#sim-volume');
 const simVolumeValue = document.querySelector('#sim-volume-value');
 const simBeatProgress = document.querySelector('#sim-beat-progress');
@@ -208,6 +210,7 @@ function updateStructuredConfigFields(config) {
   if (configStageSideLengths) {
     configStageSideLengths.value = (config.stage?.side_lengths ?? []).join(', ');
   }
+  renderStageSideLengthEditor(config.stage?.side_lengths ?? []);
 }
 
 function readConfigEditor() {
@@ -250,6 +253,65 @@ function parseIntegerList(value, fallback) {
     return fallback;
   }
   return parsed;
+}
+
+function renderStageSideLengthEditor(lengths) {
+  const normalized = Array.isArray(lengths) ? lengths.filter(item => Number.isInteger(item) && item >= 0) : [];
+  if (configStageSideLengths) {
+    configStageSideLengths.value = normalized.join(', ');
+  }
+  updateStageSideLengthSummary(normalized);
+  if (!configStageSideLengthsGrid) {
+    return;
+  }
+  configStageSideLengthsGrid.textContent = '';
+  normalized.forEach((length, index) => {
+    const field = document.createElement('label');
+    field.className = 'stage-side-length-field';
+    const label = document.createElement('span');
+    label.textContent = `Side ${index + 1}`;
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '1';
+    input.inputMode = 'numeric';
+    input.value = String(length);
+    input.dataset.sideIndex = String(index);
+    input.setAttribute('aria-label', `Stage side ${index + 1} length`);
+    input.addEventListener('input', () => {
+      const values = readStageSideLengthGrid(normalized);
+      if (configStageSideLengths) {
+        configStageSideLengths.value = values.join(', ');
+      }
+      updateStageSideLengthSummary(values);
+    });
+    field.append(label, input);
+    configStageSideLengthsGrid.append(field);
+  });
+}
+
+function readStageSideLengthGrid(fallback) {
+  if (!configStageSideLengthsGrid) {
+    return parseIntegerList(configStageSideLengths?.value ?? '', fallback);
+  }
+  const inputs = Array.from(configStageSideLengthsGrid.querySelectorAll('input'));
+  if (!inputs.length) {
+    return fallback;
+  }
+  const values = inputs.map(input => Number(input.value));
+  return values.every(value => Number.isInteger(value) && value >= 0) ? values : fallback;
+}
+
+function updateStageSideLengthSummary(lengths) {
+  if (!configStageSideLengthsSummary) {
+    return;
+  }
+  if (!lengths.length) {
+    configStageSideLengthsSummary.textContent = 'no sides configured';
+    return;
+  }
+  const total = lengths.reduce((sum, value) => sum + value, 0);
+  configStageSideLengthsSummary.textContent = `${lengths.length} sides • ${total} pixels total • min ${Math.min(...lengths)} • max ${Math.max(...lengths)}`;
 }
 
 function updateConfigFromStructuredFields() {
@@ -296,7 +358,7 @@ function updateConfigFromStructuredFields() {
   config.stage.simulation_enabled = Boolean(configStageSimulationEnabled?.checked);
   config.stage.opc_address = configStageOpcAddress?.value?.trim() ?? '';
   config.stage.brightness = numberOrFallback(configStageBrightness?.value ?? '', config.stage.brightness ?? 0);
-  config.stage.side_lengths = parseIntegerList(configStageSideLengths?.value ?? '', config.stage.side_lengths ?? []);
+  config.stage.side_lengths = readStageSideLengthGrid(config.stage.side_lengths ?? []);
   configEditor.value = JSON.stringify(config, null, 2);
   updateStructuredConfigFields(config);
 }

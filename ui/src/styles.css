@@ -5,10 +5,6 @@ body {
   margin: 1rem;
 }
 
-body:not([data-page='simulator']) {
-  padding-bottom: 18rem;
-}
-
 a {
   color: #8cc8ff;
 }
@@ -160,6 +156,42 @@ button:hover {
   grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
 }
 
+.stage-side-lengths-editor {
+  grid-column: 1 / -1;
+}
+
+.side-lengths-summary {
+  background: #0b0b0b;
+  border: 1px solid #333;
+  color: #ccc;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  margin: 0;
+  padding: 0.55rem;
+}
+
+.side-lengths-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  max-height: 18rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.stage-side-length-field {
+  background: #0b0b0b;
+  border: 1px solid #333;
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.45rem;
+}
+
+.stage-side-length-field span {
+  color: #aaa;
+  font-size: 0.75rem;
+}
+
 .midi-bindings-summary {
   background: #0b0b0b;
   border: 1px solid #333;
@@ -248,18 +280,11 @@ button:hover {
 }
 
 .opc-targets-footer {
-  background: rgba(17, 17, 17, 0.95);
-  border-top: 1px solid #555;
-  bottom: 0;
-  box-shadow: 0 -0.25rem 1rem rgba(0, 0, 0, 0.35);
+  background: #111;
+  border: 1px solid #555;
   box-sizing: border-box;
-  left: 0;
-  max-height: 45vh;
-  overflow-y: auto;
+  margin-top: 2rem;
   padding: 0.75rem 1rem;
-  position: fixed;
-  right: 0;
-  z-index: 10;
 }
 
 .opc-targets-footer h2,

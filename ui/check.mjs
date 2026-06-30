@@ -96,6 +96,8 @@ for (const marker of [
   'id="config-stage-opc-address"',
   'id="config-stage-brightness"',
   'id="config-stage-side-lengths"',
+  'id="config-stage-side-lengths-summary"',
+  'id="config-stage-side-lengths-grid"',
   'id="inputs-drawer"',
   '<summary>Inputs</summary>',
   'id="tap-tempo"',
@@ -146,7 +148,8 @@ for (const marker of [
   'className="opc-targets-footer"',
   'max-width: calc(100vw - 2rem)',
   'width: 100%',
-  'position: fixed',
+  'margin-top: 2rem',
+  '.side-lengths-grid',
 ]) {
   if (!css.includes(marker) && !app.includes(marker)) {
     console.error(`Missing required shared CSS marker: ${marker}`);
