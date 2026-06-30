@@ -1,0 +1,51 @@
+{
+  "metadata": {
+    "source": "spectrum",
+    "runner": "target/spectrum-fixture-capture/SpectrumFixtureCapture.csproj",
+    "command": "python3 tools/capture_spectrum_executable_fixtures.py",
+    "hardware_required": false,
+    "description": "Headless execution of Spectrum C# simulator command semantics."
+  },
+  "bar_simulator_commands": [
+    {
+      "is_flush": false,
+      "is_runner": false,
+      "led_index": 0,
+      "color": 1122867
+    },
+    {
+      "is_flush": false,
+      "is_runner": false,
+      "led_index": 4,
+      "color": 4478310
+    },
+    {
+      "is_flush": false,
+      "is_runner": true,
+      "led_index": 2,
+      "color": 7833753
+    },
+    {
+      "is_flush": true,
+      "is_runner": false,
+      "led_index": 0,
+      "color": 0
+    }
+  ],
+  "stage_simulator_commands": [
+    {
+      "is_flush": false,
+      "side_index": 4,
+      "led_index": 3,
+      "layer_index": 2,
+      "color": 11189196
+    },
+    {
+      "is_flush": true,
+      "side_index": 0,
+      "led_index": 0,
+      "layer_index": 0,
+      "color": 0
+    }
+  ]
+}

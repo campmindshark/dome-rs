@@ -8,6 +8,16 @@ M0 captures C# references before Rust behavior is trusted.
 python3 tools/extract_spectrum_fixtures.py
 ```
 
+Build the legacy C# project before any executable Spectrum fixture capture:
+
+```sh
+python3 tools/build_spectrum_csharp.py
+```
+
+The helper defaults to `../spectrum/Spectrum/Spectrum.csproj`. The full
+`Spectrum.sln` still references a missing `Madmom/Madmom.pyproj`, so the project
+build is the repeatable gate for the C# app and its referenced libraries.
+
 Check whether visualizer frame goldens are complete:
 
 ```sh
@@ -22,6 +32,7 @@ Generated fixture groups:
 - `fixtures/spectrum-csharp/dome_mapping.json`
 - `fixtures/spectrum-csharp/dome_geometry.json`
 - `fixtures/spectrum-csharp/bar_stage_topology.json`
+- `fixtures/spectrum-csharp/executable_capture.json`
 - `fixtures/spectrum-csharp/opc_packets/`
 - `fixtures/spectrum-csharp/visualizer_frame_cases.json`
 - `fixtures/config/spectrum_default_config.xml`
@@ -33,6 +44,7 @@ Generated fixture groups:
 - Dome strut table and control-box mapping.
 - Dome projection points and simulator coordinates.
 - Bar and stage topology.
+- Headless C# bar/stage simulator command queue semantics.
 - OPC packet bytes for single-pixel, sparse, and full-frame writes.
 - Source-traceable visualizer frame cases for every used Spectrum visualizer.
 - Captured Spectrum frame hashes for every visualizer case, produced on a

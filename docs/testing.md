@@ -59,6 +59,17 @@ Then open `http://127.0.0.1:3000`, click `Start`, and confirm the metrics advanc
 
 ## PR Full And Nightly
 
+```sh
+python3 tools/build_spectrum_csharp.py
+python3 tools/check_visualizer_goldens.py
+```
+
+`build_spectrum_csharp.py` is the Windows/.NET gate for executable Spectrum
+fixture capture. It builds `../spectrum/Spectrum/Spectrum.csproj` directly
+because the legacy solution references a missing `Madmom/Madmom.pyproj`.
+`check_visualizer_goldens.py` is expected to fail until C# frame hashes are
+captured.
+
 Next additions: browser automation/screenshots, Docker Compose wrappers around the in-process OPC/input loopback tests, load tests, and physical hardware sign-off artifacts.
 
 ## Manual Hardware Checklist

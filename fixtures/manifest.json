@@ -1,9 +1,13 @@
 {
-  "capture_tool": "tools/extract_spectrum_fixtures.py",
+  "capture_tools": [
+    "tools/extract_spectrum_fixtures.py",
+    "tools/capture_spectrum_executable_fixtures.py"
+  ],
   "fixture_groups": [
     "spectrum-csharp/dome_mapping.json",
     "spectrum-csharp/dome_geometry.json",
     "spectrum-csharp/bar_stage_topology.json",
+    "spectrum-csharp/executable_capture.json",
     "spectrum-csharp/opc_packets/",
     "spectrum-csharp/visualizer_frame_cases.json",
     "config/spectrum_default_config.xml",

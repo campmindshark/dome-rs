@@ -4,7 +4,8 @@ Reference fixtures are captured before Rust behavior is trusted.
 
 Expected fixture groups:
 
-- `spectrum-csharp/`: exported C# topology and OPC packet references
+- `spectrum-csharp/`: exported C# topology, OPC packet references, and headless executable captures
+- `spectrum-csharp/executable_capture.json`: C#-executed bar/stage simulator command queue semantics
 - `spectrum-csharp/visualizer_frame_cases.json`: source-traceable visualizer parity cases
 - `config/`: default and edge XML configs used only for migration tests
 - `orientation/`: UDP datagram samples
@@ -19,6 +20,7 @@ frame hash for that case.
 
 ```sh
 python3 tools/extract_spectrum_fixtures.py
+python3 tools/capture_spectrum_executable_fixtures.py
 ```
 
 ## Examples
