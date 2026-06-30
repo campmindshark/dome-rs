@@ -25327,7 +25327,7 @@ async function activateOperatorTab(targetId) {
     panel.classList.toggle("is-active", isActive);
     panel.hidden = !isActive;
   }
-  if (targetId === "simulator-panel") {
+  if (targetId === "runtime-panel") {
     await ensureSimulatorStarted();
   } else if (!isDedicatedSimulatorPage) {
     stopSimulatorPreview();
@@ -25574,6 +25574,8 @@ var init_main = __esm({
     await refreshState();
     await loadFullConfig();
     if (isDedicatedSimulatorPage) {
+      await ensureSimulatorStarted();
+    } else {
       await ensureSimulatorStarted();
     }
   }
@@ -25885,11 +25887,16 @@ function SimulatorFrameView({ streamText }) {
     ] })
   ] });
 }
-function PreviewDrawer() {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { id: "preview-drawer", "aria-label": "Simulator Preview", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Simulator Preview" }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: "/simulator", children: "Open simulator sandbox" }) }),
+function LivePreviewPanel() {
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { id: "preview-drawer", "aria-label": "Live Preview", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Live Preview" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SimulatorFrameView, { streamText: "preview WebSocket disconnected" })
+  ] });
+}
+function SimulatorTabPanel() {
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Simulator Sandbox", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Simulator Sandbox" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: "/simulator", children: "Open isolated simulator" }) })
   ] });
 }
 function OpcTargetsFooter() {
@@ -25963,9 +25970,10 @@ function ControlApp() {
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { id: "runtime-panel", className: "operator-tab-panel is-active runtime-panel-grid", role: "tabpanel", "aria-labelledby": "runtime-tab", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RuntimeControls, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(InputsPanel, {}),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DebugVisualsPanel, {})
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DebugVisualsPanel, {}),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LivePreviewPanel, {})
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { id: "simulator-panel", className: "operator-tab-panel", role: "tabpanel", "aria-labelledby": "simulator-tab", hidden: true, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PreviewDrawer, {}) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { id: "simulator-panel", className: "operator-tab-panel", role: "tabpanel", "aria-labelledby": "simulator-tab", hidden: true, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SimulatorTabPanel, {}) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { id: "palettes-panel", className: "operator-tab-panel", role: "tabpanel", "aria-labelledby": "palettes-tab", hidden: true, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PaletteDrawer, {}) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", { id: "config-panel", className: "operator-tab-panel", role: "tabpanel", "aria-labelledby": "config-tab", hidden: true, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConfigEditor, {}) })
     ] }),

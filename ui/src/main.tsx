@@ -355,12 +355,20 @@ function SimulatorFrameView({ streamText }: { streamText: string }) {
   );
 }
 
-function PreviewDrawer() {
+function LivePreviewPanel() {
   return (
-    <section id="preview-drawer" aria-label="Simulator Preview">
-      <h2>Simulator Preview</h2>
-      <p><a href="/simulator">Open simulator sandbox</a></p>
+    <section id="preview-drawer" aria-label="Live Preview">
+      <h2>Live Preview</h2>
       <SimulatorFrameView streamText="preview WebSocket disconnected" />
+    </section>
+  );
+}
+
+function SimulatorTabPanel() {
+  return (
+    <section aria-label="Simulator Sandbox">
+      <h2>Simulator Sandbox</h2>
+      <p><a href="/simulator">Open isolated simulator</a></p>
     </section>
   );
 }
@@ -443,9 +451,10 @@ function ControlApp() {
           <RuntimeControls />
           <InputsPanel />
           <DebugVisualsPanel />
+          <LivePreviewPanel />
         </section>
         <section id="simulator-panel" className="operator-tab-panel" role="tabpanel" aria-labelledby="simulator-tab" hidden>
-          <PreviewDrawer />
+          <SimulatorTabPanel />
         </section>
         <section id="palettes-panel" className="operator-tab-panel" role="tabpanel" aria-labelledby="palettes-tab" hidden>
           <PaletteDrawer />

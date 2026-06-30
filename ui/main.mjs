@@ -1008,7 +1008,7 @@ async function activateOperatorTab(targetId) {
     panel.hidden = !isActive;
   }
 
-  if (targetId === 'simulator-panel') {
+  if (targetId === 'runtime-panel') {
     await ensureSimulatorStarted();
   } else if (!isDedicatedSimulatorPage) {
     stopSimulatorPreview();
@@ -1185,5 +1185,7 @@ window.addEventListener('resize', redrawLatestSimulatorFrame);
 await refreshState();
 await loadFullConfig();
 if (isDedicatedSimulatorPage) {
+  await ensureSimulatorStarted();
+} else {
   await ensureSimulatorStarted();
 }
