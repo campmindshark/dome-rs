@@ -27,7 +27,7 @@ Other live modes:
 
 ## Support
 
-Support classification means the visualizer is used for diagnostics, fixtures, or helper behavior rather than the normal dome VJ selector. Support visualizers are not dead code. Operators access the diagnostic support modes from the **Support Diagnostics** controls on the main page, which patch the `test_pattern` config fields.
+Support classification means the visualizer is used for diagnostics, fixtures, or helper behavior rather than the normal dome VJ selector. Support visualizers are not dead code. Operators access these modes from the **Debug Visuals** drawer on the main page, which patches the `test_pattern` config fields.
 
 - `LEDDomeStrutIterationDiagnosticVisualizer`: dome diagnostic pattern.
 - `LEDDomeFlashColorsDiagnosticVisualizer`: dome diagnostic pattern.

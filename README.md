@@ -7,7 +7,7 @@
 - Browser control page served by the Rust binary at `/`.
 - Dedicated simulator page served at `/simulator`.
 - Runtime controls for engine start/stop, active dome visualizer, flash speed, active palette slot, and runtime palette colors.
-- Support diagnostic controls for dome, bar, and stage hardware checks.
+- Debug Visuals drawer for dome, bar, and stage hardware-check patterns.
 - Live Preview drawer that mirrors the runtime frame stream used for hardware output.
 - Independent `/simulator` sandbox with local controls that do not change runtime config or hardware output.
 - Dome simulator canvas streamed over WebSocket from engine frame data.
