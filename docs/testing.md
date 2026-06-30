@@ -15,6 +15,8 @@ Later increments add fixture golden tests, OPC loopback Docker services, fake Ma
 
 ## Manual Hardware Checklist
 
+Use [`hardware-readiness.md`](hardware-readiness.md) for release sign-off.
+
 - Dome flash-by-strut, strut iteration, strand test, and full-color flash.
 - Bar control box 5 and runner/corner diagnostics.
 - Stage side/layer diagnostics.

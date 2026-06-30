@@ -10,6 +10,19 @@ members = [
 ]
 resolver = "2"
 
+[package]
+name = "domers"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+domers-core = { path = "crates/core" }
+domers-outputs = { path = "crates/outputs" }
+domers-server = { path = "crates/server" }
+
 [workspace.package]
 edition = "2021"
 license = "MIT"
@@ -23,3 +36,6 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = "warn"
 pedantic = "warn"
+
+[lints]
+workspace = true

@@ -3,6 +3,15 @@
 version = 3
 
 [[package]]
+name = "domers"
+version = "0.1.0"
+dependencies = [
+ "domers-core",
+ "domers-outputs",
+ "domers-server",
+]
+
+[[package]]
 name = "domers-core"
 version = "0.1.0"
 
