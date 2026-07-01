@@ -892,13 +892,30 @@ fn snakes_frame(input: VisualizerInput) -> Vec<Rgb> {
 }
 
 fn quaternion_test_frame(input: VisualizerInput) -> Vec<Rgb> {
-    preview_frame(|index| {
-        if index % 8 < 4 {
-            input.palette[1]
-        } else {
-            input.palette[0].scale(0.3)
-        }
-    })
+    let orientation = input.orientation_override.map_or(
+        Quaternion {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        },
+        |orientation| {
+            Quaternion::from_yaw_pitch_roll(orientation.yaw, orientation.pitch, orientation.roll)
+        },
+    );
+    DOME_LED_POINTS
+        .get_or_init(build_dome_led_points)
+        .iter()
+        .map(|point| {
+            let (x, y, z) = spectrum_quaternion_test_point(point.x, point.y);
+            let (x, y, z) = orientation.transform_vector(x, y, z);
+            match max_axis_by_abs(x, y, z) {
+                0 => Rgb::from_u24(0xff_00_00),
+                1 => Rgb::from_u24(0x00_ff_00),
+                _ => Rgb::from_u24(0x00_00_ff),
+            }
+        })
+        .collect()
 }
 
 fn quaternion_multi_test_frame(_input: VisualizerInput) -> Vec<Rgb> {
@@ -1049,6 +1066,27 @@ fn paintbrush_time(input: VisualizerInput) -> f64 {
         .try_into()
         .expect("paintbrush animation cycle fits in u32");
     f64::from(frame_in_cycle) / 120.0 + input.beat_progress.rem_euclid(1.0)
+}
+
+fn spectrum_quaternion_test_point(normalized_x: f64, normalized_y: f64) -> (f64, f64, f64) {
+    let x = 2.0 * normalized_x - 1.0;
+    let y = 1.0 - 2.0 * normalized_y;
+    let z = (1.0 - x * x - y * y).sqrt();
+    (x, y, z)
+}
+
+fn max_axis_by_abs(x: f64, y: f64, z: f64) -> u8 {
+    if x.abs() > y.abs() {
+        if x.abs() > z.abs() {
+            0
+        } else {
+            2
+        }
+    } else if y.abs() > z.abs() {
+        1
+    } else {
+        2
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1753,7 +1791,7 @@ mod tests {
             (LiveVisualizer::Splat, 16_317_372_045_614_077_291),
             (LiveVisualizer::Race, 6_816_113_448_421_016_324),
             (LiveVisualizer::Snakes, 2_228_629_276_110_457_077),
-            (LiveVisualizer::QuaternionTest, 13_560_697_347_493_449_988),
+            (LiveVisualizer::QuaternionTest, 1_564_991_241_466_880_178),
             (
                 LiveVisualizer::QuaternionMultiTest,
                 12_459_070_695_921_506_308,
