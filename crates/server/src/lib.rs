@@ -429,6 +429,7 @@ impl SimulatorControls {
             palette_entries,
             midi_notes: [None; 4],
             orientation_devices: [None; 8],
+            dome_brightness: 1.0,
         }
     }
 

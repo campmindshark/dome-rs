@@ -227,6 +227,8 @@ pub struct VisualizerInput {
     pub palette: [Rgb; 8],
     /// Active Spectrum palette bank entries 0-7.
     pub palette_entries: [PaletteEntry; 8],
+    /// Product of Spectrum `domeMaxBrightness` and `domeBrightness`.
+    pub dome_brightness: f64,
 }
 
 impl Default for VisualizerInput {
@@ -267,6 +269,7 @@ impl Default for VisualizerInput {
                 PaletteEntry::solid(0xff_ff_ff),
                 PaletteEntry::solid(0),
             ],
+            dome_brightness: 1.0,
         }
     }
 }
@@ -759,7 +762,7 @@ impl SnakesRuntime {
 }
 
 /// Spectrum `domeVolumeRotationSpeed` default used by Race rotation math.
-const RACE_ROTATION_SPEED: f64 = 1.0;
+const VOLUME_ROTATION_SPEED: f64 = 0.25;
 /// Spectrum Race band half-width when `domeRadialSize` is 1.0 (see `LEDDomeRaceVisualizer`).
 const RACE_RACER_SPACING: f64 = 1.0;
 
@@ -777,6 +780,10 @@ enum RaceColoring {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[allow(
+    dead_code,
+    reason = "coloring/color_index mirror Spectrum RacerConfig for future wiring"
+)]
 struct RaceRacerConfig {
     rotation: RaceRotation,
     width: f64,
@@ -813,6 +820,10 @@ const RACE_RACER_CONFIGS: [RaceRacerConfig; 4] = [
 ];
 
 #[derive(Clone, Debug)]
+#[allow(
+    dead_code,
+    reason = "radians mirrors Spectrum Racer width; rendering uses shared RACER_WIDTHS table"
+)]
 struct RaceRacer {
     angle: f64,
     radians: f64,
@@ -832,7 +843,7 @@ impl RaceRacer {
 
     fn revs_per_second(&self, volume: f64, measure_length_ms: Option<u32>) -> f64 {
         match self.config.rotation {
-            RaceRotation::VolumeSquared => volume.mul_add(volume, RACE_ROTATION_SPEED / 12.0),
+            RaceRotation::VolumeSquared => volume.mul_add(volume, VOLUME_ROTATION_SPEED / 12.0),
             RaceRotation::Beat => {
                 let beats_per_second = match measure_length_ms {
                     Some(measure) if measure > 0 => 1000.0 / f64::from(measure),
@@ -840,7 +851,7 @@ impl RaceRacer {
                 };
                 beats_per_second / 4.0
             }
-            RaceRotation::Constant => RACE_ROTATION_SPEED / 4.0,
+            RaceRotation::Constant => VOLUME_ROTATION_SPEED / 4.0,
         }
     }
 
@@ -896,6 +907,7 @@ impl RaceRuntime {
 
         let points = DOME_LED_POINTS.get_or_init(build_dome_led_points);
         let mut point_index = 0;
+        let start_angles = self.racer_start_angles();
         for strut_index in 0..DOME_STRUTS {
             let Some(strut_length) = dome_strut_length(strut_index) else {
                 continue;
@@ -910,64 +922,19 @@ impl RaceRuntime {
                 out.push(DomeCommand::Pixel {
                     strut_index,
                     led_index,
-                    color: self.pixel_color(*input, point.x, point.y),
+                    color: race_pixel_color(*input, point.x, point.y, Some(start_angles)),
                 });
             }
         }
         out.push(DomeCommand::Flush);
     }
 
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        clippy::cast_precision_loss,
-        reason = "Spectrum truncates the floating racer height to an integer band index"
-    )]
-    fn pixel_color(&self, input: VisualizerInput, projected_x: f64, projected_y: f64) -> Rgb {
-        let px = projected_x * 2.0 - 1.0;
-        let py = projected_y * 2.0 - 1.0;
-        let mut height = 1.0 - (px * px + py * py).sqrt();
-        let mut angle = py.atan2(px);
-
-        if height > 0.9999 {
-            height = 0.9999;
+    fn racer_start_angles(&self) -> [f64; 4] {
+        let mut angles = [0.0; 4];
+        for (index, racer) in self.racers.iter().enumerate().take(angles.len()) {
+            angles[index] = racer.angle;
         }
-        let racer_loc_y = height * 4.0;
-        if racer_loc_y < 0.0 {
-            return Rgb::BLACK;
-        }
-        let racer_index = racer_loc_y as usize;
-        let local_y = (racer_loc_y - racer_index as f64 - 0.5).abs();
-        if local_y > RACE_RACER_SPACING {
-            return Rgb::BLACK;
-        }
-        let Some(racer) = self.racers.get(racer_index) else {
-            return Rgb::BLACK;
-        };
-
-        let mut start_angle = racer.angle;
-        if start_angle < 0.0 {
-            start_angle += std::f64::consts::TAU;
-        }
-        if angle < 0.0 {
-            angle += std::f64::consts::TAU;
-        }
-        let mut offset = angle - start_angle;
-        if offset < 0.0 {
-            offset += std::f64::consts::TAU;
-        }
-        if offset < std::f64::consts::TAU - racer.radians {
-            return Rgb::BLACK;
-        }
-        let loc_ang = 1.0 - (std::f64::consts::TAU - offset) / racer.radians;
-
-        match racer.config.coloring {
-            RaceColoring::Multi => race_multi_color(input, loc_ang),
-            RaceColoring::FadeExp => scale_rgb_f64(
-                input.palette[racer.config.color_index],
-                1.0 / (1.0 + (4.0 - 4.0 * loc_ang).exp()),
-            ),
-        }
+        angles
     }
 }
 
@@ -1921,7 +1888,6 @@ fn bar_segment(index: usize, infinity_width: usize, infinity_length: usize) -> u
 }
 
 const VOLUME_ANIMATION_SIZE: usize = 4;
-const VOLUME_ROTATION_SPEED: f64 = 0.25;
 const VOLUME_GRADIENT_SPEED: f64 = 0.25;
 const VOLUME_STARTING_POINTS: [usize; 6] = [22, 26, 30, 34, 38, 70];
 
@@ -2449,7 +2415,7 @@ fn animate_flash_polygon(
             break;
         }
 
-        let circle_color = if (scaled - 1.0).abs() < f64::EPSILON {
+        let circle_color = if scaled == 1.0 {
             scale_rgb_f64(flash_pad_single_color(input, animation.pad), scale_color)
         } else {
             Rgb::BLACK
@@ -2474,15 +2440,21 @@ fn flash_pad_single_color(input: &VisualizerInput, pad: u8) -> Rgb {
     if !input.flash_active {
         return Rgb::BLACK;
     }
-    input.palette_entries[pad as usize % input.palette_entries.len()].single_color()
+    scale_rgb_f64(
+        input.palette_entries[pad as usize % input.palette_entries.len()].single_color(),
+        input.dome_brightness,
+    )
 }
 
 fn flash_pad_gradient_color(input: &VisualizerInput, pad: u8, pixel_pos: f64) -> Rgb {
     if !input.flash_active {
         return Rgb::BLACK;
     }
-    input.palette_entries[pad as usize % input.palette_entries.len()]
-        .gradient_color(pixel_pos, 0.0, false)
+    scale_rgb_f64(
+        input.palette_entries[pad as usize % input.palette_entries.len()]
+            .gradient_color(pixel_pos, 0.0, false),
+        input.dome_brightness,
+    )
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2850,7 +2822,7 @@ fn race_commands(input: VisualizerInput) -> Vec<DomeCommand> {
             commands.push(DomeCommand::Pixel {
                 strut_index,
                 led_index,
-                color: race_pixel_color(input, point.x, point.y),
+                color: race_pixel_color(input, point.x, point.y, None),
             });
         }
     }
@@ -2858,12 +2830,17 @@ fn race_commands(input: VisualizerInput) -> Vec<DomeCommand> {
     commands
 }
 
-fn race_pixel_color(input: VisualizerInput, projected_x: f64, projected_y: f64) -> Rgb {
+fn race_pixel_color(
+    input: VisualizerInput,
+    projected_x: f64,
+    projected_y: f64,
+    start_angles: Option<[f64; 4]>,
+) -> Rgb {
     let px = projected_x * 2.0 - 1.0;
     let py = projected_y * 2.0 - 1.0;
     let y = 1.0 - (px * px + py * py).sqrt();
     let angle = py.atan2(px);
-    let Some((racer_index, loc_ang)) = race_location(input, y, angle) else {
+    let Some((racer_index, loc_ang)) = race_location(input, y, angle, start_angles) else {
         return Rgb::BLACK;
     };
     match racer_index {
@@ -2879,7 +2856,12 @@ fn race_pixel_color(input: VisualizerInput, projected_x: f64, projected_y: f64) 
     clippy::cast_precision_loss,
     reason = "Spectrum truncates floating racer positions to integer band indexes"
 )]
-fn race_location(input: VisualizerInput, mut y: f64, mut angle: f64) -> Option<(usize, f64)> {
+fn race_location(
+    input: VisualizerInput,
+    mut y: f64,
+    mut angle: f64,
+    start_angles: Option<[f64; 4]>,
+) -> Option<(usize, f64)> {
     const RACER_COUNT: f64 = 4.0;
     const RACER_WIDTHS: [f64; 4] = [1.0, 0.25, 0.125, 1.0];
     if y > 0.9999 {
@@ -2888,7 +2870,7 @@ fn race_location(input: VisualizerInput, mut y: f64, mut angle: f64) -> Option<(
     let racer_loc_y = y * RACER_COUNT;
     let racer_index = usize::try_from(racer_loc_y as isize).ok()?;
     let local_y = (racer_loc_y - racer_index as f64 - 0.5).abs();
-    if local_y > 1.0 {
+    if local_y > RACE_RACER_SPACING {
         return None;
     }
     if racer_index >= RACER_WIDTHS.len() {
@@ -2897,7 +2879,10 @@ fn race_location(input: VisualizerInput, mut y: f64, mut angle: f64) -> Option<(
     if angle < 0.0 {
         angle += std::f64::consts::PI * 2.0;
     }
-    let start_angle = race_start_angle(input, racer_index);
+    let start_angle = match start_angles {
+        Some(angles) => angles[racer_index].rem_euclid(std::f64::consts::TAU),
+        None => race_start_angle(input, racer_index),
+    };
     let mut offset = angle - start_angle;
     if offset < 0.0 {
         offset += std::f64::consts::PI * 2.0;
@@ -4369,6 +4354,7 @@ mod tests {
             accent: palette[2],
             palette,
             palette_entries,
+            dome_brightness: config.dome.brightness,
         }
     }
 
