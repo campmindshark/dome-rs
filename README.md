@@ -21,6 +21,18 @@
 
 ## Quick Start
 
+Install/check local development dependencies:
+
+```sh
+tools/install_dev_deps.sh
+```
+
+Use `tools/install_dev_deps.sh --check` to verify Rust, Python, ALSA/PortAudio,
+and the sibling Spectrum Madmom checkout without changing anything. On Linux the
+installer uses `sudo apt-get` for system headers and `python3 -m pip --user` for
+Madmom Python packages. Set `SPECTRUM_REPO=/path/to/spectrum` if the Spectrum
+checkout is not next to `domers`.
+
 Start the operator server with the checked example config:
 
 ```sh
@@ -91,10 +103,11 @@ See [docs/configuration.md](docs/configuration.md) for the TOML schema, palette 
 ## Development
 
 ```sh
+tools/install_dev_deps.sh --check
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cd ui && npm install && npm run build && cd ..
+cd ui && bun install && bun run build && cd ..
 node ui/check.mjs
 ```
 

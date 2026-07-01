@@ -5,10 +5,11 @@ The automated suite covers deterministic runtime behavior, protocol encoding, co
 ## PR Fast
 
 ```sh
+tools/install_dev_deps.sh --check
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cd ui && npm install && npm run build && cd ..
+cd ui && bun install && bun run build && cd ..
 node ui/check.mjs
 ```
 
@@ -39,9 +40,10 @@ replacement decisions stay visible.
 ## Example Local Run
 
 ```sh
+tools/install_dev_deps.sh --check
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-cd ui && npm install && npm run build && cd ..
+cd ui && bun install && bun run build && cd ..
 node ui/check.mjs
 ```
 
@@ -58,6 +60,21 @@ cargo run --bin domers -- doctor --config examples/domers.toml --bind 127.0.0.1:
 ```
 
 Then open `http://127.0.0.1:3000`, click `Start`, and confirm the metrics advance.
+
+## Dependency Setup
+
+Run the installer once on a new Linux development machine:
+
+```sh
+tools/install_dev_deps.sh
+```
+
+It installs apt packages for native Rust/Python audio builds, user-site Python
+packages for Madmom, CPU Torch wheels, and an editable install of the sibling
+Spectrum `Madmom` checkout. Use `SPECTRUM_REPO=/path/to/spectrum` if the legacy
+checkout is not at `../spectrum`. Use `--check` for a read-only validation pass,
+`--python-only` after system packages are already present, or `--system-only`
+when you only want the apt packages.
 
 ## PR Full And Nightly
 
