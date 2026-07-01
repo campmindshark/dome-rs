@@ -857,7 +857,10 @@ impl ServerState {
             controls.volume = animated_volume(self.now_ms());
         }
         if self.inputs.beat.beat_ms().is_some() {
-            controls.beat_progress = self.inputs.beat.progress(self.now_ms(), 1.0);
+            controls.beat_progress = self
+                .inputs
+                .beat
+                .progress(self.now_ms(), MEASURE_PROGRESS_FACTOR);
         } else if self.running {
             controls.beat_progress = animated_beat_progress(self.now_ms());
         }
@@ -2726,8 +2729,14 @@ fn stage_side_lengths(config: &DomersConfig) -> Vec<usize> {
         .collect()
 }
 
+const FALLBACK_BEAT_MS: u64 = 1_000;
+const BEATS_PER_MEASURE: u64 = 4;
+const FALLBACK_MEASURE_MS: u64 = FALLBACK_BEAT_MS * BEATS_PER_MEASURE;
+const FALLBACK_MEASURE_MS_F64: f64 = 4_000.0;
+const MEASURE_PROGRESS_FACTOR: f64 = 0.25;
+
 fn animated_beat_progress(now_ms: u64) -> f64 {
-    f64::from((now_ms % 1_000) as u32) / 1_000.0
+    f64::from((now_ms % FALLBACK_MEASURE_MS) as u32) / FALLBACK_MEASURE_MS_F64
 }
 
 #[allow(
@@ -2877,6 +2886,32 @@ mod tests {
         let second = state.operator_frame().dome;
 
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn fallback_preview_uses_spectrum_measure_timing() {
+        let mut state = ServerState::default();
+        state.start();
+
+        state.set_now_ms_for_test(1_000);
+        assert!((state.visualizer_controls().beat_progress - 0.25).abs() < f64::EPSILON);
+
+        state.set_now_ms_for_test(4_000);
+        assert!(state.visualizer_controls().beat_progress.abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn tapped_tempo_visualizers_use_measure_progress() {
+        let mut state = ServerState::default();
+        state.start();
+        state.tap_tempo_at(0);
+        state.tap_tempo_at(500);
+        state.tap_tempo_at(1_000);
+
+        state.set_now_ms_for_test(1_250);
+
+        assert!((state.snapshot().inputs.beat_progress - 0.5).abs() < 0.01);
+        assert!((state.visualizer_controls().beat_progress - 0.125).abs() < 0.01);
     }
 
     #[test]
