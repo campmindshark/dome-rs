@@ -3641,6 +3641,22 @@ pub struct Quaternion {
 }
 
 impl Quaternion {
+    /// Build from Spectrum's `(x, y, z, w)` float components.
+    #[must_use]
+    pub fn from_spectrum_components(x: f32, y: f32, z: f32, w: f32) -> Self {
+        Self {
+            x: f64::from(x),
+            y: f64::from(y),
+            z: f64::from(z),
+            w: f64::from(w),
+        }
+        .normalize()
+    }
+
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Paintbrush idle orientation mirrors C# CreateFromYawPitchRoll float angles"
+    )]
     fn from_unitless_yaw_pitch_roll(yaw: f64, pitch: f64, roll: f64) -> Self {
         Self::from_yaw_pitch_roll_f32(
             (std::f64::consts::TAU * yaw) as f32,
@@ -3649,6 +3665,10 @@ impl Quaternion {
         )
     }
 
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "Orientation overrides are radians passed through C#-compatible float trig"
+    )]
     fn from_yaw_pitch_roll(yaw: f64, pitch: f64, roll: f64) -> Self {
         Self::from_yaw_pitch_roll_f32(yaw as f32, pitch as f32, roll as f32)
     }
@@ -4379,9 +4399,7 @@ mod tests {
 
     /// Replay one captured multi-frame Spectrum sequence through the persistent
     /// `VisualizerRuntime` and compare each frame's FNV-1a hash to the C# golden.
-    /// Ignored by default: run explicitly while converging exactness.
     #[test]
-    #[ignore = "run explicitly while converging Spectrum sequence goldens"]
     #[allow(
         clippy::cast_possible_wrap,
         clippy::cast_sign_loss,
@@ -4954,7 +4972,7 @@ mod tests {
             LiveVisualizer::Volume,
             VisualizerInput {
                 animation_frame: 120,
-                beat_progress: 0.65,
+                beat_progress: 1.0,
                 ..VisualizerInput::default()
             },
         );
@@ -5230,85 +5248,5 @@ mod tests {
         assert!(commands
             .iter()
             .any(|command| matches!(command, domers_outputs::StageCommand::Flush)));
-    }
-
-    #[test]
-    fn flash_frame2_hash_for_shape_57() {
-        let config = import_spectrum_xml(include_str!(
-            "../../../fixtures/config/spectrum_default_config.xml"
-        ))
-        .config;
-        let manifest: SequenceManifest = serde_json::from_str(include_str!(
-            "../../../fixtures/spectrum-csharp/visualizer_sequence_cases.json"
-        ))
-        .unwrap();
-        let case = manifest
-            .cases
-            .iter()
-            .find(|c| c.case == "dome_flash_idle_and_active_placeholder")
-            .unwrap();
-        let expected = case.expected.frames[2].parse::<u64>().unwrap();
-        let meta = &manifest.capture_metadata;
-        let frame_input = &case.input_sequence[2];
-        let start_ms = ((meta.clock_base_ticks + 500_000) / 10_000) as u64;
-        let now_ms = ((meta.clock_base_ticks + 1_000_000) / 10_000) as u64;
-        let mut input = visualizer_input(frame_input, &config);
-        input.now_ms = now_ms;
-        input.measure_length_ms = Some(meta.beat_measure_ms);
-
-        let layout = super::concentric_layout_from_point(57, 2);
-        let struts = super::flash_layout_struts(&layout);
-        let shape = super::FlashShape {
-            layout,
-            struts,
-            animation: None,
-        };
-        let animation =
-            super::FlashPolygonAnimation::new(0, 0.8, meta.beat_measure_ms, start_ms);
-        let mut commands = Vec::new();
-        super::animate_flash_polygon(&shape, &animation, &input, now_ms, &mut commands);
-        let actual = frame_hash(&commands);
-        assert_eq!(Some(actual), Some(expected));
-    }
-
-    #[test]
-    fn flash_runtime_replay_matches_direct_frame2() {
-        let config = import_spectrum_xml(include_str!(
-            "../../../fixtures/config/spectrum_default_config.xml"
-        ))
-        .config;
-        let manifest: SequenceManifest = serde_json::from_str(include_str!(
-            "../../../fixtures/spectrum-csharp/visualizer_sequence_cases.json"
-        ))
-        .unwrap();
-        let case = manifest
-            .cases
-            .iter()
-            .find(|c| c.case == "dome_flash_idle_and_active_placeholder")
-            .unwrap();
-        let expected = case.expected.frames[2].parse::<u64>().unwrap();
-        let meta = &manifest.capture_metadata;
-        let frame_delta = case.frame_delta_ticks.unwrap_or(meta.frame_delta_ticks);
-        let mut runtime = VisualizerRuntime::default();
-        for (frame_index, frame_input) in case.input_sequence.iter().enumerate().take(3) {
-            let now_ticks = meta.clock_base_ticks + (frame_index as i64) * frame_delta;
-            let now_ms = (now_ticks / 10_000) as u64;
-            let mut input = visualizer_input(frame_input, &config);
-            input.now_ms = now_ms;
-            input.measure_length_ms = Some(meta.beat_measure_ms);
-            input.midi_notes = [None; MAX_FRAME_MIDI_NOTES];
-            for (slot, note) in frame_input
-                .midi
-                .iter()
-                .enumerate()
-                .take(MAX_FRAME_MIDI_NOTES)
-            {
-                input.midi_notes[slot] = Some(*note);
-            }
-            let commands = runtime.render_dome(LiveVisualizer::Flash, input);
-            if frame_index == 2 {
-                assert_eq!(Some(frame_hash(&commands)), Some(expected));
-            }
-        }
     }
 }

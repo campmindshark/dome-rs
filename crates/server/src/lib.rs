@@ -41,8 +41,9 @@ use domers_outputs::{
 use domers_visualizers::{
     render_bar_diagnostic, render_dome_diagnostic, render_stage_visualizer,
     render_stage_visualizer_with_input, BarDiagnosticVisualizer, DiagnosticInput,
-    DomeDiagnosticVisualizer, LiveVisualizer, OrientationOverride, StageVisualizer,
-    StageVisualizerInput, VisualizerInput, VisualizerRuntime,
+    DomeDiagnosticVisualizer, LiveVisualizer, OrientationDeviceInput, OrientationOverride,
+    Quaternion, StageVisualizer, StageVisualizerInput, VisualizerInput, VisualizerRuntime,
+    MAX_ORIENTATION_DEVICES,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "native-capture")]
@@ -887,9 +888,11 @@ impl ServerState {
         let diagnostic_frame_index = self.metrics.frames;
         let now_ms = self.now_ms();
         let measure_length_ms = self.measure_length_ms();
+        let orientation_devices = orientation_device_inputs(&self.inputs.orientation.devices());
         render_operator_frame(
             &self.config,
             simulator,
+            &orientation_devices,
             diagnostic_frame_index,
             visualizer_frame_index,
             now_ms,
@@ -1474,9 +1477,11 @@ impl AppRuntime {
         let visualizer_frame_index = self.sandbox_frame_index.fetch_add(1, Ordering::Relaxed);
         let diagnostic_frame_index = state.metrics.frames;
         let now_ms = visualizer_frame_index.saturating_mul(SANDBOX_PREVIEW_FRAME_MS);
+        let orientation_devices = [None; MAX_ORIENTATION_DEVICES];
         let frame = render_operator_frame(
             &config,
             request.simulator_controls(),
+            &orientation_devices,
             diagnostic_frame_index,
             visualizer_frame_index,
             now_ms,
@@ -2691,9 +2696,14 @@ fn serialize_stage_commands(commands: Vec<StageCommand>) -> Vec<StageSimulatorCo
         .collect()
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Operator frame assembly mirrors the Spectrum per-frame input bundle"
+)]
 fn render_operator_frame(
     config: &DomersConfig,
     simulator: SimulatorControls,
+    orientation_devices: &[Option<OrientationDeviceInput>; MAX_ORIENTATION_DEVICES],
     diagnostic_frame_index: u64,
     visualizer_frame_index: u64,
     now_ms: u64,
@@ -2704,8 +2714,10 @@ fn render_operator_frame(
     let inputs = input_specs(simulator);
     let outputs = output_specs(config);
     let schedule = schedule_operator_frame(&inputs, &outputs);
-    let visualizer_input =
+    let mut visualizer_input =
         simulator.visualizer_input(&engine, visualizer_frame_index, now_ms, measure_length_ms);
+    visualizer_input.orientation_devices = *orientation_devices;
+    visualizer_input.dome_brightness = config.dome.brightness;
     let diagnostic_input = DiagnosticInput {
         state: diagnostic_state(diagnostic_frame_index),
         step: diagnostic_step(diagnostic_frame_index),
@@ -2850,6 +2862,23 @@ fn render_scheduled_visualizer(
 )]
 fn brightness_f32(brightness: f64) -> f32 {
     brightness.clamp(0.0, 1.0) as f32
+}
+
+fn orientation_device_inputs(
+    devices: &[OrientationDevice],
+) -> [Option<OrientationDeviceInput>; MAX_ORIENTATION_DEVICES] {
+    let mut inputs = [None; MAX_ORIENTATION_DEVICES];
+    for (slot, device) in devices.iter().enumerate().take(MAX_ORIENTATION_DEVICES) {
+        let rotation = device.current_rotation();
+        inputs[slot] = Some(OrientationDeviceInput {
+            device_id: device.device_id,
+            rotation: Quaternion::from_spectrum_components(
+                rotation.x, rotation.y, rotation.z, rotation.w,
+            ),
+            action_flag: device.action_flag,
+        });
+    }
+    inputs
 }
 
 fn orientation_override_from_degrees(yaw: f64, pitch: f64, roll: f64) -> OrientationOverride {
