@@ -24990,6 +24990,23 @@ function formatNumber(value) {
 function toColorInput(color) {
   return `#${color.toString(16).padStart(6, "0")}`;
 }
+function boostDisplayColor(color) {
+  const r = color >> 16 & 255;
+  const g = color >> 8 & 255;
+  const b = color & 255;
+  const max = Math.max(r, g, b);
+  if (max <= 0) {
+    return 0;
+  }
+  const multiplier = Math.sqrt(255 / max);
+  const boostedR = Math.min(255, Math.round(r * multiplier));
+  const boostedG = Math.min(255, Math.round(g * multiplier));
+  const boostedB = Math.min(255, Math.round(b * multiplier));
+  return boostedR << 16 | boostedG << 8 | boostedB;
+}
+function toDisplayColorInput(color) {
+  return toColorInput(boostDisplayColor(color));
+}
 function fromColorInput(color) {
   return Number.parseInt(color.replace("#", ""), 16);
 }
@@ -25117,7 +25134,7 @@ function drawDomeFrameBuffer() {
   });
 }
 function drawLed(x, y, color, radius) {
-  context.fillStyle = toColorInput(color);
+  context.fillStyle = toDisplayColorInput(color);
   const size = Math.max(1, radius);
   context.fillRect(Math.round(x), Math.round(y), size, size);
 }
@@ -25200,6 +25217,7 @@ function resizeSimulatorCanvas() {
   canvas.width = size;
   canvas.height = size;
   rebuildDomeLedPoints();
+  resetDomeFrameColors();
   return true;
 }
 function resizeSupportCanvas(canvasElement, canvasContext, fallbackWidth, fallbackHeight) {
@@ -25218,7 +25236,12 @@ function resizeSupportCanvas(canvasElement, canvasContext, fallbackWidth, fallba
 }
 function redrawLatestSimulatorFrame() {
   if (latestSimulatorFrame) {
-    scheduleSimulatorFrame(latestSimulatorFrame);
+    resizeSimulatorCanvas();
+    resetDomeFrameColors();
+    applyDomeCommands(latestSimulatorFrame.commands ?? []);
+    paintDomeCanvas();
+    drawBarSimulator(latestSimulatorFrame.bar_commands ?? []);
+    drawStageSimulator(latestSimulatorFrame.stage_commands ?? []);
   } else {
     resizeSimulatorCanvas();
     resetDomeFrameColors();
@@ -25237,7 +25260,7 @@ function updateSimulatorMetrics(frame) {
 }
 function scheduleSimulatorFrame(frame) {
   latestSimulatorFrame = frame;
-  pendingSimulatorFrame = frame;
+  pendingSimulatorFrames.push(frame);
   updateSimulatorMetrics(frame);
   if (simulatorPaintQueued) {
     return;
@@ -25245,26 +25268,38 @@ function scheduleSimulatorFrame(frame) {
   simulatorPaintQueued = true;
   window.requestAnimationFrame(() => {
     simulatorPaintQueued = false;
-    const frameToDraw = pendingSimulatorFrame;
-    pendingSimulatorFrame = void 0;
-    if (frameToDraw) {
-      drawSimulatorFrame(frameToDraw);
+    const framesToDraw = pendingSimulatorFrames.splice(0);
+    if (framesToDraw.length) {
+      drawSimulatorFrames(framesToDraw);
     }
   });
 }
-function drawSimulatorFrame(frame) {
-  resizeSimulatorCanvas();
-  for (const command of frame.commands) {
+function drawSimulatorFrames(frames) {
+  const canvasResized = resizeSimulatorCanvas();
+  for (const frame of frames) {
+    applyDomeCommands(frame.commands ?? []);
+  }
+  paintDomeCanvas();
+  const latestFrame = frames.at(-1);
+  drawBarSimulator(latestFrame?.bar_commands ?? []);
+  drawStageSimulator(latestFrame?.stage_commands ?? []);
+  if (canvasResized && latestFrame) {
+    latestSimulatorFrame = latestFrame;
+  }
+}
+function applyDomeCommands(commands) {
+  for (const command of commands) {
     if (command.kind === "frame") {
       drawFrame(command.colors);
     } else if (command.kind === "pixel") {
       drawPixel(command);
+    } else if (command.kind === "flush") {
     }
   }
+}
+function paintDomeCanvas() {
   clearCanvas();
   drawDomeFrameBuffer();
-  drawBarSimulator(frame.bar_commands ?? []);
-  drawStageSimulator(frame.stage_commands ?? []);
 }
 function drawBarSimulator(commands) {
   if (!barSimulator || !barContext) {
@@ -25299,7 +25334,7 @@ function drawLedStrip(canvasContext, { label, y, count, colors }) {
   canvasContext.fillRect(marginX, y - 10, barSimulator.width - marginX - 14, 20);
   for (const command of colors) {
     const x = marginX + command.led_index * width;
-    canvasContext.fillStyle = toColorInput(command.color);
+    canvasContext.fillStyle = toDisplayColorInput(command.color);
     canvasContext.fillRect(Math.round(x), Math.round(y - 8), Math.max(1, Math.ceil(width)), 16);
   }
 }
@@ -25330,7 +25365,7 @@ function drawStageSimulator(commands) {
       baseRadius,
       layerStep
     );
-    stageContext.fillStyle = toColorInput(command.color);
+    stageContext.fillStyle = toDisplayColorInput(command.color);
     stageContext.beginPath();
     stageContext.arc(point.x, point.y, point.size, 0, Math.PI * 2);
     stageContext.fill();
@@ -25495,6 +25530,9 @@ async function ensureSimulatorStarted() {
   } else {
     rebuildDomeLedPoints();
   }
+  pendingSimulatorFrames = [];
+  resetDomeFrameColors();
+  clearCanvas();
   if (isDedicatedSimulatorPage) {
     if (streamStatus) {
       streamStatus.textContent = "simulator sandbox";
@@ -25507,6 +25545,8 @@ async function ensureSimulatorStarted() {
 }
 function stopSimulatorPreview() {
   simulatorStarted = false;
+  pendingSimulatorFrames = [];
+  resetDomeFrameColors();
   if (simulatorSocket) {
     simulatorSocket.close();
     simulatorSocket = void 0;
@@ -25543,7 +25583,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, manualBpm, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxOrientationEnabled, sandboxOrientationYaw, sandboxOrientationYawValue, sandboxOrientationPitch, sandboxOrientationPitchValue, sandboxOrientationRoll, sandboxOrientationRollValue, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, domeLedStrutOffsets, domeFrameColors, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, manualBpm, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxOrientationEnabled, sandboxOrientationYaw, sandboxOrientationYawValue, sandboxOrientationPitch, sandboxOrientationPitchValue, sandboxOrientationRoll, sandboxOrientationRollValue, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, domeLedStrutOffsets, domeFrameColors, latestSimulatorFrame, pendingSimulatorFrames, simulatorPaintQueued, simulatorStarted, simulatorSocket;
 var init_main = __esm({
   async "main.mjs"() {
     "use strict";
@@ -25645,6 +25685,7 @@ var init_main = __esm({
     domeLedPoints = [];
     domeLedStrutOffsets = [];
     domeFrameColors = [];
+    pendingSimulatorFrames = [];
     simulatorPaintQueued = false;
     simulatorStarted = false;
     renderPaletteEditor();
