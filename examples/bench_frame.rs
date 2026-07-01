@@ -39,7 +39,7 @@ fn main() {
     config.stage.simulation_enabled = true;
 
     // Report frame sizes for context.
-    let probe = ServerState::new(config.clone());
+    let mut probe = ServerState::new(config.clone());
     let frame = probe.operator_frame();
     println!(
         "frame command counts: dome={} bar={} stage={}",
@@ -55,7 +55,7 @@ fn main() {
     for vis in 0u8..=8 {
         let mut c = config.clone();
         c.dome.active_visualizer = vis;
-        let state = ServerState::new(c);
+        let mut state = ServerState::new(c);
         bench(&format!("operator_frame dome_vis={vis}"), iters, || {
             let f = state.operator_frame();
             f.dome.len() + f.bar.len() + f.stage.len()
