@@ -298,6 +298,9 @@ pub fn render_dome_visualizer(
     if visualizer == LiveVisualizer::Snakes {
         return snakes_commands();
     }
+    if visualizer == LiveVisualizer::Race {
+        return race_commands(input);
+    }
     let mut sink = DomeOutputSink::new(false, true);
     sink.write_buffer(match visualizer {
         LiveVisualizer::TvStatic => unreachable!("TV Static writes Spectrum-style pixel commands"),
@@ -305,7 +308,7 @@ pub fn render_dome_visualizer(
         LiveVisualizer::Flash => unreachable!("Flash visualizer is event-driven"),
         LiveVisualizer::Radial => radial_frame(input),
         LiveVisualizer::Splat => splat_frame(input),
-        LiveVisualizer::Race => race_frame(input),
+        LiveVisualizer::Race => unreachable!("Race writes Spectrum-style pixel commands"),
         LiveVisualizer::Snakes => unreachable!("Snakes writes Spectrum-style pixel commands"),
         LiveVisualizer::QuaternionTest => quaternion_test_frame(input),
         LiveVisualizer::QuaternionMultiTest => quaternion_multi_test_frame(input),
@@ -1015,18 +1018,112 @@ struct Splat {
     color_index: usize,
 }
 
-fn race_frame(input: VisualizerInput) -> Vec<Rgb> {
-    let offset = phase_offset(input.beat_progress);
-    preview_frame(|index| {
-        let distance = (index + DOME_PIXELS - offset) % DOME_PIXELS;
-        if distance < 320 {
-            input.palette[2]
-        } else if distance < 640 {
-            input.palette[1].scale(0.45)
-        } else {
-            Rgb::BLACK
+fn race_commands(input: VisualizerInput) -> Vec<DomeCommand> {
+    let points = DOME_LED_POINTS.get_or_init(build_dome_led_points);
+    let mut commands = Vec::with_capacity(DOME_PIXELS + 1);
+    let mut point_index = 0;
+    for strut_index in 0..DOME_STRUTS {
+        let Some(strut_length) = dome_strut_length(strut_index) else {
+            continue;
+        };
+        for led_index in 0..strut_length {
+            let point = points.get(point_index).copied().unwrap_or(DomeLedPoint {
+                index: point_index,
+                x: 0.5,
+                y: 0.5,
+            });
+            point_index += 1;
+            commands.push(DomeCommand::Pixel {
+                strut_index,
+                led_index,
+                color: race_pixel_color(input, point.x, point.y),
+            });
         }
-    })
+    }
+    commands.push(DomeCommand::Flush);
+    commands
+}
+
+fn race_pixel_color(input: VisualizerInput, projected_x: f64, projected_y: f64) -> Rgb {
+    let px = projected_x * 2.0 - 1.0;
+    let py = projected_y * 2.0 - 1.0;
+    let y = 1.0 - (px * px + py * py).sqrt();
+    let angle = py.atan2(px);
+    let Some((racer_index, loc_ang)) = race_location(y, angle) else {
+        return Rgb::BLACK;
+    };
+    match racer_index {
+        0 | 3 => race_multi_color(input, loc_ang),
+        1 => scale_rgb_f64(input.palette[1], 1.0 / (1.0 + (4.0 - 4.0 * loc_ang).exp())),
+        2 => scale_rgb_f64(input.palette[2], 1.0 / (1.0 + (4.0 - 4.0 * loc_ang).exp())),
+        _ => Rgb::BLACK,
+    }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    reason = "Spectrum truncates floating racer positions to integer band indexes"
+)]
+fn race_location(mut y: f64, mut angle: f64) -> Option<(usize, f64)> {
+    const RACER_COUNT: f64 = 4.0;
+    const RACER_WIDTHS: [f64; 4] = [1.0, 0.25, 0.125, 1.0];
+    if y > 0.9999 {
+        y = 0.9999;
+    }
+    let racer_loc_y = y * RACER_COUNT;
+    let racer_index = usize::try_from(racer_loc_y as isize).ok()?;
+    let local_y = (racer_loc_y - racer_index as f64 - 0.5).abs();
+    if local_y > 1.0 {
+        return None;
+    }
+    if racer_index >= RACER_WIDTHS.len() {
+        return None;
+    }
+    if angle < 0.0 {
+        angle += std::f64::consts::PI * 2.0;
+    }
+    let radians = std::f64::consts::PI * 2.0 * RACER_WIDTHS[racer_index];
+    if angle < std::f64::consts::PI * 2.0 - radians {
+        return None;
+    }
+    Some((
+        racer_index,
+        1.0 - (std::f64::consts::PI * 2.0 - angle) / radians,
+    ))
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "Spectrum truncates palette segment selection from normalized racer location"
+)]
+fn race_multi_color(input: VisualizerInput, loc_ang: f64) -> Rgb {
+    let scaled = loc_ang.clamp(0.0, 1.0) * 4.0;
+    let min_color_index = (scaled as usize).min(4);
+    let max_color_index = min_color_index + 1;
+    let scaled_pixel_pos = (loc_ang - min_color_index as f64 / 4.0) * 4.0;
+    blend_spectrum_rgb(
+        input.palette[min_color_index],
+        input.palette[max_color_index],
+        scaled_pixel_pos,
+    )
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Spectrum LEDColor.GradientColor truncates blended double channels to bytes"
+)]
+fn blend_spectrum_rgb(color1: Rgb, color2: Rgb, distance: f64) -> Rgb {
+    let distance = distance.clamp(0.0, 1.0);
+    let inverse = 1.0 - distance;
+    Rgb {
+        r: (distance * f64::from(color1.r) + inverse * f64::from(color2.r)) as u8,
+        g: (distance * f64::from(color1.g) + inverse * f64::from(color2.g)) as u8,
+        b: (distance * f64::from(color1.b) + inverse * f64::from(color2.b)) as u8,
+    }
 }
 
 fn snakes_commands() -> Vec<DomeCommand> {
@@ -1987,7 +2084,7 @@ mod tests {
             (LiveVisualizer::Flash, 14_695_981_039_346_656_037),
             (LiveVisualizer::Radial, 8_095_729_372_390_775_204),
             (LiveVisualizer::Splat, 12_459_070_695_921_506_308),
-            (LiveVisualizer::Race, 6_816_113_448_421_016_324),
+            (LiveVisualizer::Race, 7_871_414_923_077_219_675),
             (LiveVisualizer::Snakes, 3_377_082_443_979_724_166),
             (LiveVisualizer::QuaternionTest, 1_564_991_241_466_880_178),
             (
