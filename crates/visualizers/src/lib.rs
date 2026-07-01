@@ -1613,8 +1613,8 @@ fn race_pixel_color(input: VisualizerInput, projected_x: f64, projected_y: f64) 
     let px = projected_x * 2.0 - 1.0;
     let py = projected_y * 2.0 - 1.0;
     let y = 1.0 - (px * px + py * py).sqrt();
-    let angle = py.atan2(px) + runtime_angle_offset(input, 360);
-    let Some((racer_index, loc_ang)) = race_location(y, angle) else {
+    let angle = py.atan2(px);
+    let Some((racer_index, loc_ang)) = race_location(input, y, angle) else {
         return Rgb::BLACK;
     };
     match racer_index {
@@ -1630,7 +1630,7 @@ fn race_pixel_color(input: VisualizerInput, projected_x: f64, projected_y: f64) 
     clippy::cast_precision_loss,
     reason = "Spectrum truncates floating racer positions to integer band indexes"
 )]
-fn race_location(mut y: f64, mut angle: f64) -> Option<(usize, f64)> {
+fn race_location(input: VisualizerInput, mut y: f64, mut angle: f64) -> Option<(usize, f64)> {
     const RACER_COUNT: f64 = 4.0;
     const RACER_WIDTHS: [f64; 4] = [1.0, 0.25, 0.125, 1.0];
     if y > 0.9999 {
@@ -1648,14 +1648,38 @@ fn race_location(mut y: f64, mut angle: f64) -> Option<(usize, f64)> {
     if angle < 0.0 {
         angle += std::f64::consts::PI * 2.0;
     }
+    let start_angle = race_start_angle(input, racer_index);
+    let mut offset = angle - start_angle;
+    if offset < 0.0 {
+        offset += std::f64::consts::PI * 2.0;
+    }
     let radians = std::f64::consts::PI * 2.0 * RACER_WIDTHS[racer_index];
-    if angle < std::f64::consts::PI * 2.0 - radians {
+    if offset < std::f64::consts::PI * 2.0 - radians {
         return None;
     }
     Some((
         racer_index,
-        1.0 - (std::f64::consts::PI * 2.0 - angle) / radians,
+        1.0 - (std::f64::consts::PI * 2.0 - offset) / radians,
     ))
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "Runtime preview frame counter is small and used as elapsed Spectrum seconds"
+)]
+fn race_start_angle(input: VisualizerInput, racer_index: usize) -> f64 {
+    if input.animation_frame == 0 {
+        return 0.0;
+    }
+    let seconds = input.animation_frame as f64 / 100.0;
+    let volume = f64::from(input.volume.clamp(0.0, 1.0));
+    let revs_per_second = match racer_index {
+        0 | 1 => volume.mul_add(volume, VOLUME_ROTATION_SPEED / 12.0),
+        2 => 0.25,
+        3 => VOLUME_ROTATION_SPEED / 4.0,
+        _ => 0.0,
+    };
+    (seconds * revs_per_second * std::f64::consts::TAU).rem_euclid(std::f64::consts::TAU)
 }
 
 #[allow(
@@ -1713,19 +1737,11 @@ fn snakes_commands() -> Vec<DomeCommand> {
 
 fn quaternion_test_frame(input: VisualizerInput) -> Vec<Rgb> {
     let orientation = input.orientation_override.map_or_else(
-        || {
-            if input.animation_frame == 0 {
-                Quaternion {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                    w: 1.0,
-                }
-            } else {
-                let yaw = runtime_angle_offset(input, 480);
-                let pitch = -0.35 * runtime_angle_offset(input, 720).sin();
-                Quaternion::from_yaw_pitch_roll(yaw, pitch, 0.0)
-            }
+        || Quaternion {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
         },
         |orientation| {
             Quaternion::from_yaw_pitch_roll(orientation.yaw, orientation.pitch, orientation.roll)
@@ -1747,21 +1763,27 @@ fn quaternion_test_frame(input: VisualizerInput) -> Vec<Rgb> {
 }
 
 fn quaternion_multi_test_frame(input: VisualizerInput) -> Vec<Rgb> {
-    if input.animation_frame == 0 {
+    let Some(orientation_override) = input.orientation_override else {
         return vec![Rgb::BLACK; DOME_PIXELS];
-    }
-    let progress = runtime_visualizer_progress(input, 360);
+    };
+    let orientation = Quaternion::from_yaw_pitch_roll(
+        orientation_override.yaw,
+        orientation_override.pitch,
+        orientation_override.roll,
+    );
+    let spot = (0.0, 1.0, 0.0);
     DOME_LED_POINTS
         .get_or_init(build_dome_led_points)
         .iter()
         .map(|point| {
-            let wave = ((point.x + progress).rem_euclid(1.0) * std::f64::consts::TAU).sin();
-            let band = ((point.y + progress * 0.5).rem_euclid(1.0) * std::f64::consts::TAU).cos();
-            hsv_to_rgb(
-                (progress + point.x * 0.35 + point.y * 0.2).rem_euclid(1.0),
-                0.75,
-                ((wave + band + 2.0) / 4.0).clamp(0.1, 1.0),
-            )
+            let (x, y, z) = spectrum_quaternion_test_point(point.x, point.y);
+            let (rx, ry, rz) = orientation.transform_vector(x, y, z);
+            let distance = distance3(rx, ry, rz, spot.0, spot.1, spot.2);
+            if distance < 0.2 {
+                hsv_to_rgb(0.0, 1.0, ((0.2 - distance) / 0.2).clamp(0.0, 1.0))
+            } else {
+                Rgb::BLACK
+            }
         })
         .collect()
 }
@@ -1793,9 +1815,9 @@ fn quaternion_paintbrush_frame(input: VisualizerInput) -> Vec<Rgb> {
             let strength = potential - threshold;
             let hue = (1.0 + orientation.w) / 2.0;
 
-            let mut color = Rgb::BLACK;
+            let mut color = paintbrush_twinkle(input, point.index, z);
             if strength > 0.0 {
-                color = hsv_to_rgb(hue, saturation, 1.0);
+                color = light_paint(color, hsv_to_rgb(hue, saturation, 1.0));
             }
 
             for (trail_orientation, fade) in &trail_orientations {
@@ -2015,18 +2037,35 @@ fn runtime_visualizer_progress_unwrapped(input: VisualizerInput, frames_per_cycl
     input.animation_frame as f64 / frames_per_cycle as f64
 }
 
-fn runtime_angle_offset(input: VisualizerInput, period_frames: u64) -> f64 {
-    runtime_visualizer_progress(input, period_frames) * std::f64::consts::TAU
-}
-
 fn spectrum_nudge(random: &mut DotNetRandom, scale: f64) -> f64 {
     (random.next_double() - 0.5) * 2.0 * scale
 }
 
 fn paintbrush_frame_in_cycle(input: VisualizerInput) -> u32 {
-    (input.animation_frame % 57_600)
+    input
+        .animation_frame
+        .min(u64::from(u32::MAX))
         .try_into()
-        .expect("paintbrush animation cycle fits in u32")
+        .expect("paintbrush animation frame fits in u32")
+}
+
+fn paintbrush_twinkle(input: VisualizerInput, point_index: usize, z: f64) -> Rgb {
+    if input.animation_frame == 0 || z <= 0.2 {
+        return Rgb::BLACK;
+    }
+    let frame_bucket = input.animation_frame / 3;
+    let seed = i32::try_from(
+        ((frame_bucket.wrapping_mul(1_103_515_245))
+            ^ u64::try_from(point_index).expect("point index fits in u64"))
+            % i32::MAX as u64,
+    )
+    .expect("twinkle seed fits in i32");
+    let mut random = DotNetRandom::new(seed);
+    if random.next_double() < 0.001 {
+        Rgb::from_u24(0xff_ff_ff)
+    } else {
+        Rgb::BLACK
+    }
 }
 
 fn spectrum_quaternion_test_point(normalized_x: f64, normalized_y: f64) -> (f64, f64, f64) {
@@ -2720,8 +2759,6 @@ mod tests {
             LiveVisualizer::Radial,
             LiveVisualizer::Splat,
             LiveVisualizer::Race,
-            LiveVisualizer::QuaternionTest,
-            LiveVisualizer::QuaternionMultiTest,
         ] {
             let first_runtime = render_dome_visualizer(
                 visualizer,
@@ -2743,6 +2780,36 @@ mod tests {
                 "{visualizer:?} should animate during live preview"
             );
         }
+    }
+
+    #[test]
+    fn quaternion_multi_uses_orientation_devices_not_fake_idle_motion() {
+        let idle = render_dome_visualizer(
+            LiveVisualizer::QuaternionMultiTest,
+            VisualizerInput {
+                animation_frame: 120,
+                ..VisualizerInput::default()
+            },
+        );
+        let oriented = render_dome_visualizer(
+            LiveVisualizer::QuaternionMultiTest,
+            VisualizerInput {
+                animation_frame: 120,
+                orientation_override: Some(OrientationOverride {
+                    yaw: 0.0,
+                    pitch: 0.0,
+                    roll: 0.0,
+                }),
+                ..VisualizerInput::default()
+            },
+        );
+
+        assert!(frame_colors(&idle)
+            .iter()
+            .all(|color| *color == domers_core::Rgb::BLACK));
+        assert!(frame_colors(&oriented)
+            .iter()
+            .any(|color| *color != domers_core::Rgb::BLACK));
     }
 
     #[test]
