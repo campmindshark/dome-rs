@@ -2,6 +2,7 @@
 
 CONFIG ?= examples/domers.toml
 BIND ?= 127.0.0.1:3000
+TEST_BIND ?= 127.0.0.1:13000
 FEATURES ?=
 SPECTRUM_XML ?= fixtures/config/spectrum_default_config.xml
 OUTPUT_CONFIG ?= domers.toml
@@ -42,6 +43,7 @@ help:
 	@echo "Variables:"
 	@echo "  CONFIG=$(CONFIG)"
 	@echo "  BIND=$(BIND)"
+	@echo "  TEST_BIND=$(TEST_BIND)"
 	@echo "  FEATURES=$(FEATURES)"
 	@echo "  SPECTRUM_XML=$(SPECTRUM_XML)"
 	@echo "  OUTPUT_CONFIG=$(OUTPUT_CONFIG)"
@@ -67,6 +69,9 @@ build-ui:
 
 run:
 	cargo run --bin domers $(CARGO_FEATURE_FLAGS) -- run --config "$(CONFIG)" --bind "$(BIND)"
+
+run-test:
+	$(MAKE) run CONFIG="$(CONFIG)" BIND="$(TEST_BIND)"
 
 run-release: build-backend-release
 	./target/release/domers run --config "$(CONFIG)" --bind "$(BIND)"

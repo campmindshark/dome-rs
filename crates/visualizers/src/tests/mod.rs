@@ -430,6 +430,7 @@ pub(crate) fn visualizer_input(
         palette,
         palette_entries,
         dome_brightness: 1.0,
+        ..VisualizerInput::default()
     }
 }
 
@@ -695,14 +696,15 @@ pub(crate) fn tv_static_advances_persistent_rng_across_frames() {
 #[test]
 pub(crate) fn switch_wipes_previous_visualizer() {
     let mut runtime = VisualizerRuntime::default();
-    // Snakes emits pixel deltas; the very first activation must not prepend a
-    // clearing frame (nothing is on the dome yet).
     let first = runtime.render_dome(LiveVisualizer::Snakes, VisualizerInput::default());
     assert!(
-        !matches!(first.first(), Some(DomeCommand::Frame(_))),
-        "first activation should not emit a clearing frame"
+        first.iter().any(|command| matches!(command, DomeCommand::Pixel { .. })),
+        "snakes activation should begin with a sparse blackout wipe"
     );
-    // Switching visualizers clears the dome with a leading all-black frame.
+    assert!(
+        matches!(first.last(), Some(DomeCommand::Flush)),
+        "snakes wipe should flush to hardware and preview consumers"
+    );
     let switched = runtime.render_dome(LiveVisualizer::Radial, VisualizerInput::default());
     match switched.first() {
         Some(DomeCommand::Frame(colors)) => {
@@ -1070,4 +1072,155 @@ pub(crate) fn stage_depth_level_emits_layered_pixels() {
     assert!(commands
         .iter()
         .any(|command| matches!(command, domers_outputs::StageCommand::Flush)));
+}
+
+fn lit_pixel_fraction(commands: &[DomeCommand]) -> f64 {
+    let colors = frame_colors(commands);
+    let lit = colors
+        .iter()
+        .filter(|color| **color != domers_core::Rgb::BLACK)
+        .count();
+    lit as f64 / colors.len() as f64
+}
+
+#[test]
+pub(crate) fn radial_live_uses_spectrum_default_narrow_slice() {
+    let mut runtime = VisualizerRuntime::default();
+    let commands = runtime.render_dome(
+        LiveVisualizer::Radial,
+        VisualizerInput {
+            volume: 0.7,
+            beat_progress: 0.0,
+            animation_frame: 1,
+            ..VisualizerInput::default()
+        },
+    );
+    let fraction = lit_pixel_fraction(&commands);
+    assert!(
+        fraction < 0.25,
+        "live radial should light a narrow wedge (got {fraction:.1}% lit)"
+    );
+    assert!(
+        fraction > 0.005,
+        "live radial should still show a visible slice (got {fraction:.1}% lit)"
+    );
+}
+
+#[test]
+pub(crate) fn radial_live_rotation_follows_beat_progress() {
+    let mut runtime = VisualizerRuntime::default();
+    let base = VisualizerInput {
+        volume: 0.7,
+        animation_frame: 2,
+        ..VisualizerInput::default()
+    };
+    let at_start = runtime.render_dome(
+        LiveVisualizer::Radial,
+        VisualizerInput {
+            beat_progress: 0.0,
+            ..base
+        },
+    );
+    let mid_measure = runtime.render_dome(
+        LiveVisualizer::Radial,
+        VisualizerInput {
+            beat_progress: 0.5,
+            ..base
+        },
+    );
+    assert_ne!(
+        frame_hash(&at_start),
+        frame_hash(&mid_measure),
+        "radial center angle should advance when beat progress changes"
+    );
+}
+
+#[test]
+pub(crate) fn strut_iteration_throttles_to_one_step_per_second() {
+    let mut runtime = VisualizerRuntime::default();
+    let enable = runtime.render_strut_iteration(0, 1.0);
+    assert!(
+        enable.iter().any(|command| matches!(command, DomeCommand::Pixel { .. })),
+        "enable should wipe the dome before stepping"
+    );
+    let first = runtime.render_strut_iteration(0, 1.0);
+    let within_window = runtime.render_strut_iteration(500, 1.0);
+    let after_window = runtime.render_strut_iteration(1_001, 1.0);
+
+    assert!(first.is_empty(), "first tick waits for Spectrum stopwatch");
+    assert!(
+        within_window.is_empty(),
+        "strut iteration should not advance before 1s elapses"
+    );
+    assert!(
+        !after_window.is_empty(),
+        "strut iteration should advance after 1s elapses"
+    );
+}
+
+#[test]
+pub(crate) fn strut_iteration_enable_resets_with_black_frame() {
+    let mut runtime = VisualizerRuntime::default();
+    runtime.render_strut_iteration(0, 1.0);
+    runtime.clear_strut_iteration();
+    let commands = runtime.render_strut_iteration(0, 1.0);
+    assert!(
+        commands.iter().any(|command| match command {
+            DomeCommand::Pixel { color, .. } => *color == domers_core::Rgb::BLACK,
+            _ => false,
+        }),
+        "strut iteration enable should wipe the dome before stepping"
+    );
+}
+
+#[test]
+pub(crate) fn quaternion_multi_runtime_renders_orientation_override() {
+    let mut runtime = VisualizerRuntime::default();
+    let commands = runtime.render_dome(
+        LiveVisualizer::QuaternionMultiTest,
+        VisualizerInput {
+            animation_frame: 1,
+            orientation_override: Some(OrientationOverride {
+                yaw: 0.0,
+                pitch: 0.0,
+                roll: 0.0,
+            }),
+            ..VisualizerInput::default()
+        },
+    );
+    assert!(
+        frame_colors(&commands)
+            .iter()
+            .any(|color| *color != domers_core::Rgb::BLACK),
+        "multi-test runtime should paint from orientation override via persistent fade buffer"
+    );
+}
+
+#[test]
+pub(crate) fn beat_progress_zero_freezes_radial_across_frames() {
+    let mut runtime = VisualizerRuntime::default();
+    let base = VisualizerInput {
+        volume: 0.7,
+        beat_progress: 0.0,
+        ..VisualizerInput::default()
+    };
+    let first = runtime.render_dome(
+        LiveVisualizer::Radial,
+        VisualizerInput {
+            animation_frame: 1,
+            ..base
+        },
+    );
+    let later = runtime.render_dome(
+        LiveVisualizer::Radial,
+        VisualizerInput {
+            animation_frame: 120,
+            ..base
+        },
+    );
+    assert_eq!(
+        frame_hash(&first),
+        frame_hash(&later),
+        "with beat progress pinned at 0.0, radial should not rotate between preview frames"
+    );
 }

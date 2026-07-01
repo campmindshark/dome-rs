@@ -126,6 +126,14 @@ pub struct VisualizerInput {
     pub palette_entries: [PaletteEntry; 8],
     /// Product of Spectrum `domeMaxBrightness` and `domeBrightness`.
     pub dome_brightness: f64,
+    /// Spectrum `orientationDeviceSpotlight` (default 0).
+    pub orientation_device_spotlight: i32,
+    /// Spectrum `orientationShowContours`.
+    pub orientation_show_contours: bool,
+    /// True when every connected orientation device is POI type (`onlyPoi()`).
+    pub orientation_only_poi: bool,
+    /// Spectrum `domeTwinkleDensity`.
+    pub dome_twinkle_density: f64,
 }
 
 impl Default for VisualizerInput {
@@ -169,6 +177,10 @@ impl Default for VisualizerInput {
                 PaletteEntry::solid(0),
             ],
             dome_brightness: 1.0,
+            orientation_device_spotlight: 0,
+            orientation_show_contours: false,
+            orientation_only_poi: false,
+            dome_twinkle_density: 0.0,
         }
     }
 }
@@ -182,6 +194,10 @@ pub struct OrientationDeviceInput {
     pub rotation: Quaternion,
     /// Spectrum action flag (button press state).
     pub action_flag: u8,
+    /// Spectrum device type byte (2 = POI).
+    pub device_type: u8,
+    /// POI average distance when speed is present.
+    pub avg_distance_short: f64,
 }
 
 /// One MIDI note event delivered during a frame (`index` = pad, `value` = velocity).

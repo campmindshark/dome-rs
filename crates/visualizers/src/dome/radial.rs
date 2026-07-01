@@ -4,7 +4,7 @@ use crate::{
     dome::{VOLUME_GRADIENT_SPEED, VOLUME_ROTATION_SPEED},
     geometry::{build_dome_led_points, DOME_LED_POINTS},
     input::VisualizerInput,
-    math::{map_wrap, runtime_visualizer_progress_unwrapped, wrap},
+    math::{map_wrap, runtime_visualizer_progress_unwrapped, wrap, DOME_RADIAL_SIZE_GOLDEN},
 };
 
 #[allow(
@@ -24,7 +24,7 @@ pub(crate) fn radial_frame(input: VisualizerInput) -> Vec<Rgb> {
     let current_angle = wrap(progress * VOLUME_ROTATION_SPEED * 0.25, 0.0, 1.0);
     let current_gradient = wrap(progress * VOLUME_GRADIENT_SPEED, 0.0, 1.0);
     let which_gradient = (f64::from(input.volume.clamp(0.0, 1.0)) * 8.0) as usize;
-    let size_limit = adjusted_level;
+    let size_limit = DOME_RADIAL_SIZE_GOLDEN * adjusted_level;
 
     DOME_LED_POINTS
         .get_or_init(build_dome_led_points)

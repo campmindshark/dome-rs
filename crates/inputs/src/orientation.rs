@@ -232,7 +232,19 @@ impl OrientationInputState {
     /// Snapshot active devices in stable device-id order.
     #[must_use]
     pub fn devices(&self) -> Vec<OrientationDevice> {
-        self.devices.values().cloned().collect()
+        let mut devices: Vec<_> = self.devices.values().cloned().collect();
+        devices.sort_by_key(|device| device.device_id);
+        devices
+    }
+
+    /// Spectrum `OrientationInput.onlyPoi()`.
+    #[must_use]
+    pub fn only_poi(&self) -> bool {
+        !self.devices.is_empty()
+            && self
+                .devices
+                .values()
+                .all(|device| device.device_type == 2)
     }
 
     /// Number of active devices.

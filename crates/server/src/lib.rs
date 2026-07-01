@@ -63,10 +63,6 @@ pub const ENGINE_FRAME_INTERVAL: Duration = Duration::from_micros(2_500);
 /// Emit simulator frames every 10 ms, matching Spectrum's WPF simulator timer.
 pub const SIMULATOR_FRAME_STRIDE: u64 = 4;
 
-/// Synthetic wall-clock advance per sandbox preview frame, matching the 10 ms
-/// simulator cadence so stateful visualizers step at Spectrum's real rate.
-const SANDBOX_PREVIEW_FRAME_MS: u64 = 10;
-
 const DOME_CONTROL_BOX_PIXEL_COUNT: usize = 214 * 8;
 
 /// Health status returned by the early API.
@@ -278,6 +274,8 @@ pub struct HardwareTargetStatus {
 pub struct SimulatorFrame {
     /// Metrics after this frame was produced.
     pub metrics: Metrics,
+    /// Active visualizer names for this frame.
+    pub active_visualizers: Vec<String>,
     /// Dome simulator commands for the frame.
     pub commands: Vec<SimulatorCommand>,
     /// Bar simulator commands for the frame.
@@ -433,6 +431,10 @@ impl SimulatorControls {
             midi_notes: [None; 4],
             orientation_devices: [None; 8],
             dome_brightness: 1.0,
+            orientation_device_spotlight: 0,
+            orientation_show_contours: false,
+            orientation_only_poi: false,
+            dome_twinkle_density: 0.0,
         }
     }
 
@@ -458,6 +460,7 @@ pub struct ServerState {
     input_epoch: Instant,
     visualizer_runtime: VisualizerRuntime,
     sandbox_visualizer_runtime: VisualizerRuntime,
+    last_broadcast_visualizers: Vec<String>,
 }
 
 impl Default for ServerState {
@@ -476,7 +479,7 @@ impl ServerState {
                 volume: 0.7,
                 beat_progress: 0.25,
                 flash_active: false,
-                orientation_override_enabled: false,
+                orientation_override_enabled: true,
                 orientation_yaw: 0.0,
                 orientation_pitch: -90.0,
                 orientation_roll: 0.0,
@@ -490,6 +493,7 @@ impl ServerState {
             input_epoch: Instant::now(),
             visualizer_runtime: VisualizerRuntime::default(),
             sandbox_visualizer_runtime: VisualizerRuntime::default(),
+            last_broadcast_visualizers: Vec::new(),
         }
     }
 
@@ -566,7 +570,9 @@ impl ServerState {
             self.simulator.volume = volume.clamp(0.0, 1.0);
         }
         if let Some(beat_progress) = patch.beat_progress {
-            self.simulator.beat_progress = beat_progress.clamp(0.0, 1.0);
+            if self.inputs.beat.beat_ms().is_none() {
+                self.simulator.beat_progress = beat_progress.clamp(0.0, 1.0);
+            }
         }
         if let Some(flash_active) = patch.flash_active {
             self.simulator.flash_active = flash_active;
@@ -887,7 +893,6 @@ impl ServerState {
         visualizer_frame_index: u64,
     ) -> OperatorCommandFrame {
         let simulator = self.visualizer_controls();
-        let diagnostic_frame_index = self.metrics.frames;
         let now_ms = self.now_ms();
         let measure_length_ms = self.measure_length_ms();
         let beat_progress_rotation =
@@ -899,7 +904,7 @@ impl ServerState {
             &self.config,
             simulator,
             &orientation_devices,
-            diagnostic_frame_index,
+            self.inputs.orientation.only_poi(),
             visualizer_frame_index,
             now_ms,
             measure_length_ms,
@@ -916,11 +921,15 @@ impl ServerState {
     /// Return a serializable snapshot.
     #[must_use]
     pub fn snapshot(&self) -> ServerSnapshot {
+        let mut simulator = self.simulator;
+        if self.inputs.beat.beat_ms().is_some() {
+            simulator.beat_progress = self.inputs.beat.progress(self.now_ms(), 1.0);
+        }
         ServerSnapshot {
             running: self.running,
             config: EngineConfig::from(&self.config),
             metrics: self.metrics,
-            simulator: self.simulator,
+            simulator,
             diagnostics: self.diagnostic_controls(),
             hardware: HardwareStatus::default(),
             inputs: self.input_status(),
@@ -974,9 +983,11 @@ impl ServerState {
         } else if let Some(volume) = self.inputs.volume {
             controls.volume = volume;
         }
-        if self.inputs.beat.beat_ms().is_some() {
-            // Spectrum visualizers read `ProgressThroughMeasure` (= factor 1.0).
+        if let Some(_beat_ms) = self.inputs.beat.beat_ms() {
             controls.beat_progress = self.inputs.beat.progress(self.now_ms(), 1.0);
+        } else {
+            // Spectrum `ProgressThroughMeasure` returns 0.0 when tempo is unknown.
+            controls.beat_progress = 0.0;
         }
         controls
     }
@@ -1463,6 +1474,11 @@ impl AppRuntime {
         let frame = state.simulator_frame();
         SimulatorFrame {
             metrics: state.metrics(),
+            active_visualizers: frame
+                .active_visualizers
+                .iter()
+                .map(|name| (*name).to_string())
+                .collect(),
             commands: serialize_commands(frame.dome),
             bar_commands: serialize_bar_commands(frame.bar),
             stage_commands: serialize_stage_commands(frame.stage),
@@ -1478,23 +1494,37 @@ impl AppRuntime {
         let mut config = state.full_config();
         request.apply_to_config(&mut config);
         let visualizer_frame_index = self.sandbox_frame_index.fetch_add(1, Ordering::Relaxed);
-        let diagnostic_frame_index = state.metrics.frames;
-        let now_ms = visualizer_frame_index.saturating_mul(SANDBOX_PREVIEW_FRAME_MS);
-        let orientation_devices = [None; MAX_ORIENTATION_DEVICES];
+        let now_ms = state.now_ms();
+        let mut simulator_controls = request.simulator_controls();
+        if state.inputs.beat.beat_ms().is_some() {
+            simulator_controls.beat_progress = state.inputs.beat.progress(now_ms, 1.0);
+        }
+        let measure_length_ms = state.measure_length_ms();
+        let beat_progress_rotation =
+            measure_length_ms.map(|_| state.inputs.beat.progress(now_ms, VOLUME_ROTATION_SPEED));
+        let beat_progress_gradient =
+            measure_length_ms.map(|_| state.inputs.beat.progress(now_ms, VOLUME_GRADIENT_SPEED));
+        let orientation_devices =
+            orientation_device_inputs(&state.inputs.orientation.devices());
         let frame = render_operator_frame(
             &config,
-            request.simulator_controls(),
+            simulator_controls,
             &orientation_devices,
-            diagnostic_frame_index,
+            state.inputs.orientation.only_poi(),
             visualizer_frame_index,
             now_ms,
-            None,
-            None,
-            None,
+            measure_length_ms,
+            beat_progress_rotation,
+            beat_progress_gradient,
             &mut state.sandbox_visualizer_runtime,
         );
         SimulatorFrame {
             metrics: state.metrics(),
+            active_visualizers: frame
+                .active_visualizers
+                .iter()
+                .map(|name| (*name).to_string())
+                .collect(),
             commands: serialize_commands(frame.dome),
             bar_commands: serialize_bar_commands(frame.bar),
             stage_commands: serialize_stage_commands(frame.stage),
@@ -1518,15 +1548,31 @@ impl AppRuntime {
                 state.engine_frame();
                 let config = state.full_config();
                 let operator_frame = state.operator_frame();
+                let visualizers_changed = operator_frame.active_visualizers
+                    != state.last_broadcast_visualizers;
+                if visualizers_changed {
+                    state.last_broadcast_visualizers = operator_frame
+                        .active_visualizers
+                        .iter()
+                        .map(|name| (*name).to_string())
+                        .collect();
+                }
 
                 #[allow(
                     clippy::manual_is_multiple_of,
                     reason = "The is_multiple_of method is newer than the workspace MSRV"
                 )]
-                let maybe_frame = if frame_count % SIMULATOR_FRAME_STRIDE == 0 {
+                let maybe_frame = if visualizers_changed
+                    || frame_count % SIMULATOR_FRAME_STRIDE == 0
+                {
                     state.record_simulator_frame();
                     Some(SimulatorFrame {
                         metrics: state.metrics(),
+                        active_visualizers: operator_frame
+                            .active_visualizers
+                            .iter()
+                            .map(|name| (*name).to_string())
+                            .collect(),
                         commands: serialize_commands(operator_frame.dome.clone()),
                         bar_commands: serialize_bar_commands(operator_frame.bar.clone()),
                         stage_commands: serialize_stage_commands(operator_frame.stage.clone()),
@@ -2709,7 +2755,7 @@ fn render_operator_frame(
     config: &DomersConfig,
     simulator: SimulatorControls,
     orientation_devices: &[Option<OrientationDeviceInput>; MAX_ORIENTATION_DEVICES],
-    diagnostic_frame_index: u64,
+    orientation_only_poi: bool,
     visualizer_frame_index: u64,
     now_ms: u64,
     measure_length_ms: Option<u32>,
@@ -2727,9 +2773,13 @@ fn render_operator_frame(
     visualizer_input.beat_progress_gradient = beat_progress_gradient;
     visualizer_input.orientation_devices = *orientation_devices;
     visualizer_input.dome_brightness = config.dome.brightness;
+    visualizer_input.orientation_device_spotlight = 0;
+    visualizer_input.orientation_show_contours = false;
+    visualizer_input.dome_twinkle_density = 0.0;
+    visualizer_input.orientation_only_poi = orientation_only_poi;
     let diagnostic_input = DiagnosticInput {
-        state: diagnostic_state(diagnostic_frame_index),
-        step: diagnostic_step(diagnostic_frame_index),
+        state: diagnostic_state(now_ms),
+        step: diagnostic_step(now_ms),
         brightness: brightness_f32(config.dome.brightness),
         volume: simulator.volume,
         beat_progress: simulator.beat_progress,
@@ -2742,10 +2792,15 @@ fn render_operator_frame(
         ..OperatorCommandFrame::default()
     };
 
+    if config.dome.test_pattern != 2 {
+        runtime.clear_strut_iteration();
+    }
+
     for visualizer in &schedule.active_visualizers {
         render_scheduled_visualizer(
             visualizer,
             config,
+            now_ms,
             diagnostic_input,
             visualizer_input,
             runtime,
@@ -2756,24 +2811,23 @@ fn render_operator_frame(
     frame
 }
 
-/// Engine frames per second (2.5 ms per `engine_frame`); Spectrum diagnostics
-/// advance once per second via their `DeterministicStopwatch` (`> 1000 ms`).
-const DIAGNOSTIC_THROTTLE_FRAMES: u64 = 400;
+/// Spectrum diagnostics advance once per second via `DeterministicStopwatch`.
+const DIAGNOSTIC_STEP_MS: u64 = 1_000;
 
 #[allow(
     clippy::cast_possible_truncation,
     reason = "Diagnostic state intentionally wraps to a three-state animation cycle"
 )]
-fn diagnostic_state(frame_index: u64) -> u8 {
-    ((frame_index / DIAGNOSTIC_THROTTLE_FRAMES) % 3) as u8
+fn diagnostic_state(now_ms: u64) -> u8 {
+    ((now_ms / DIAGNOSTIC_STEP_MS) % 3) as u8
 }
 
 #[allow(
     clippy::cast_possible_truncation,
     reason = "Diagnostic step intentionally wraps to the displayable fixture range"
 )]
-fn diagnostic_step(frame_index: u64) -> usize {
-    (frame_index / DIAGNOSTIC_THROTTLE_FRAMES) as usize
+fn diagnostic_step(now_ms: u64) -> usize {
+    (now_ms / DIAGNOSTIC_STEP_MS) as usize
 }
 
 fn live_visualizer_from_name(name: &str) -> Option<LiveVisualizer> {
@@ -2800,6 +2854,7 @@ fn live_visualizer_from_name(name: &str) -> Option<LiveVisualizer> {
 fn render_scheduled_visualizer(
     visualizer: &str,
     config: &DomersConfig,
+    now_ms: u64,
     diagnostic_input: DiagnosticInput,
     visualizer_input: VisualizerInput,
     runtime: &mut VisualizerRuntime,
@@ -2817,9 +2872,9 @@ fn render_scheduled_visualizer(
             diagnostic_input,
         )),
         "LEDDomeStrutIterationDiagnosticVisualizer" => {
-            frame.dome.extend(render_dome_diagnostic(
-                DomeDiagnosticVisualizer::StrutIteration,
-                diagnostic_input,
+            frame.dome.extend(runtime.render_strut_iteration(
+                now_ms,
+                brightness_f32(config.dome.brightness),
             ));
         }
         "LEDDomeStrandTestDiagnosticVisualizer" => frame.dome.extend(render_dome_diagnostic(
@@ -2885,6 +2940,8 @@ fn orientation_device_inputs(
                 rotation.x, rotation.y, rotation.z, rotation.w,
             ),
             action_flag: device.action_flag,
+            device_type: device.device_type,
+            avg_distance_short: device.avg_distance_short,
         });
     }
     inputs
@@ -3389,21 +3446,37 @@ mod tests {
         config.dome.test_pattern = 2;
         let mut state = ServerState::new(config);
 
+        state.set_now_ms_for_test(0);
+        let _ = state.operator_frame().dome;
+        state.set_now_ms_for_test(0);
         let first = state.operator_frame().dome;
         // Spectrum diagnostics only advance once per second; a sub-second step
         // must leave the frame unchanged.
-        for _ in 0..(super::DIAGNOSTIC_THROTTLE_FRAMES / 2) {
-            state.engine_frame();
-        }
+        state.set_now_ms_for_test(500);
         let within_second = state.operator_frame().dome;
         assert_eq!(first, within_second);
 
         // Crossing the one-second throttle advances the diagnostic.
-        for _ in 0..super::DIAGNOSTIC_THROTTLE_FRAMES {
-            state.engine_frame();
-        }
+        state.set_now_ms_for_test(1_001);
         let next_second = state.operator_frame().dome;
         assert_ne!(first, next_second);
+    }
+
+    #[test]
+    fn support_diagnostics_advance_without_engine_frames() {
+        let mut config = DomersConfig::default();
+        config.dome.test_pattern = 2;
+        let mut state = ServerState::new(config);
+
+        state.set_now_ms_for_test(0);
+        let _ = state.operator_frame().dome;
+        state.set_now_ms_for_test(0);
+        let first = state.operator_frame().dome;
+        state.set_now_ms_for_test(1_001);
+        let next = state.operator_frame().dome;
+
+        assert_eq!(state.metrics().frames, 0);
+        assert_ne!(first, next);
     }
 
     #[test]

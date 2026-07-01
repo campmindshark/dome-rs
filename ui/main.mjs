@@ -102,6 +102,8 @@ let pendingSimulatorFrames = [];
 let simulatorPaintQueued = false;
 let simulatorStarted = false;
 let simulatorSocket;
+let sandboxAnimationFrameId;
+let sandboxFrameInFlight = false;
 let hostAudioDevices = null;
 
 renderPaletteEditor();
@@ -823,12 +825,21 @@ function resetDomeFrameColors() {
 }
 
 let lastRenderedVisualizer = null;
-// Sparse visualizers (Snakes, Race, Volume, TV Static) only patch some LEDs, so
-// switching visualizers must clear the persistent buffer to avoid ghosting the
-// previous visualizer's pixels.
+let lastStreamedVisualizers = null;
 function noteActiveVisualizer(visualizer) {
   if (visualizer !== lastRenderedVisualizer) {
     lastRenderedVisualizer = visualizer;
+    resetDomeFrameColors();
+  }
+}
+
+function noteStreamedVisualizers(activeVisualizers) {
+  if (!Array.isArray(activeVisualizers)) {
+    return;
+  }
+  const key = activeVisualizers.join('|');
+  if (key !== lastStreamedVisualizers) {
+    lastStreamedVisualizers = key;
     resetDomeFrameColors();
   }
 }
@@ -1038,6 +1049,7 @@ function drawSimulatorFrame(frame) {
 function drawSimulatorFrames(frames) {
   const canvasResized = resizeSimulatorCanvas();
   for (const frame of frames) {
+    noteStreamedVisualizers(frame.active_visualizers);
     applyDomeCommands(frame.commands ?? []);
   }
   paintDomeCanvas();
@@ -1254,27 +1266,54 @@ async function refreshPreviewFrame() {
 }
 
 async function refreshSandboxFrame() {
-  if (!canvas) {
+  if (!canvas || sandboxFrameInFlight) {
     return;
   }
-  updateSandboxControlLabels();
-  noteActiveVisualizer(Number(sandboxActiveVisualizer?.value ?? 0));
-  scheduleSimulatorFrame(await request('/api/simulator/sandbox-frame', {
-    method: 'POST',
-    body: JSON.stringify({
-      active_visualizer: Number(sandboxActiveVisualizer?.value ?? 0),
-      volume: Number(sandboxVolume?.value ?? 0.7),
-      beat_progress: Number(sandboxBeatProgress?.value ?? 0.25),
-      flash_active: sandboxFlashActive?.checked ?? true,
-      orientation_override_enabled: sandboxOrientationEnabled?.checked ?? false,
-      orientation_yaw: readNumberInput(sandboxOrientationYaw, 0),
-      orientation_pitch: readNumberInput(sandboxOrientationPitch, -90),
-      orientation_roll: readNumberInput(sandboxOrientationRoll, 0),
-      primary: fromColorInput(sandboxPalettePrimary?.value ?? '#00ff00'),
-      secondary: fromColorInput(sandboxPaletteSecondary?.value ?? '#0080ff'),
-      accent: fromColorInput(sandboxPaletteAccent?.value ?? '#ff4080'),
-    }),
-  }));
+  sandboxFrameInFlight = true;
+  try {
+    updateSandboxControlLabels();
+    noteActiveVisualizer(Number(sandboxActiveVisualizer?.value ?? 0));
+    scheduleSimulatorFrame(await request('/api/simulator/sandbox-frame', {
+      method: 'POST',
+      body: JSON.stringify({
+        active_visualizer: Number(sandboxActiveVisualizer?.value ?? 0),
+        volume: Number(sandboxVolume?.value ?? 0.7),
+        beat_progress: Number(sandboxBeatProgress?.value ?? 0.25),
+        flash_active: sandboxFlashActive?.checked ?? true,
+        orientation_override_enabled: sandboxOrientationEnabled?.checked ?? false,
+        orientation_yaw: readNumberInput(sandboxOrientationYaw, 0),
+        orientation_pitch: readNumberInput(sandboxOrientationPitch, -90),
+        orientation_roll: readNumberInput(sandboxOrientationRoll, 0),
+        primary: fromColorInput(sandboxPalettePrimary?.value ?? '#00ff00'),
+        secondary: fromColorInput(sandboxPaletteSecondary?.value ?? '#0080ff'),
+        accent: fromColorInput(sandboxPaletteAccent?.value ?? '#ff4080'),
+      }),
+    }));
+  } finally {
+    sandboxFrameInFlight = false;
+  }
+}
+
+function startSandboxAnimationLoop() {
+  if (!isDedicatedSimulatorPage || sandboxAnimationFrameId !== undefined) {
+    return;
+  }
+  const tick = () => {
+    if (!simulatorStarted) {
+      sandboxAnimationFrameId = undefined;
+      return;
+    }
+    void refreshSandboxFrame();
+    sandboxAnimationFrameId = window.requestAnimationFrame(tick);
+  };
+  sandboxAnimationFrameId = window.requestAnimationFrame(tick);
+}
+
+function stopSandboxAnimationLoop() {
+  if (sandboxAnimationFrameId !== undefined) {
+    window.cancelAnimationFrame(sandboxAnimationFrameId);
+    sandboxAnimationFrameId = undefined;
+  }
 }
 
 function updateSandboxControlLabels() {
@@ -1324,6 +1363,7 @@ async function ensureSimulatorStarted() {
       streamStatus.textContent = 'simulator sandbox';
     }
     await refreshSandboxFrame();
+    startSandboxAnimationLoop();
   } else {
     scheduleSimulatorFrame(await request('/api/simulator/frame'));
     connectSimulatorStream();
@@ -1334,6 +1374,7 @@ function stopSimulatorPreview() {
   simulatorStarted = false;
   pendingSimulatorFrames = [];
   resetDomeFrameColors();
+  stopSandboxAnimationLoop();
   if (simulatorSocket) {
     simulatorSocket.close();
     simulatorSocket = undefined;

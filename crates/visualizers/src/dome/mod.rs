@@ -7,13 +7,17 @@ mod snakes;
 mod splat;
 mod tv_static;
 mod volume;
+mod wipe;
 
+pub(crate) use wipe::dome_blackout_commands;
 pub(crate) use flash::{
     animate_flash_polygon, clear_flash_strut, flash_layout_struts, FlashPolygonAnimation,
     FlashShape,
 };
 pub(crate) use paintbrush::quaternion_paintbrush_frame;
-pub(crate) use quaternion::{quaternion_multi_test_frame, quaternion_test_frame};
+pub(crate) use quaternion::{
+    quaternion_multi_test_color_at, quaternion_multi_test_frame, quaternion_test_frame,
+};
 pub(crate) use race::{race_commands, race_pixel_color, RaceRacer, RACE_RACER_CONFIGS};
 pub(crate) use radial::radial_frame;
 #[cfg(test)]

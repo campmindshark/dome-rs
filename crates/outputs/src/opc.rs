@@ -161,6 +161,7 @@ pub fn apply_dome_commands(channel: &mut PersistentChannel, commands: &[DomeComm
                         channel.set_pixel(*device_index, color);
                     }
                 }
+                channel.flush();
             }
             DomeCommand::Pixel {
                 strut_index,
@@ -286,6 +287,7 @@ struct DomeMappingFixture {
     control_box_strut_order: Vec<Vec<String>>,
     strut_lengths: std::collections::HashMap<String, usize>,
     strut_positions: Vec<StrutPosition>,
+    max_strip_length: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -357,14 +359,12 @@ impl DomeMappingFixture {
     }
 
     fn strand_pixel_index(&self, control_box_strut_index: usize) -> Option<usize> {
+        let max_strip = self.max_strip_length;
         let mut struts_left = control_box_strut_index;
         let mut pixel_index = 0;
         for strand in &self.control_box_strut_order {
             if strand.len() <= struts_left {
-                pixel_index += strand
-                    .iter()
-                    .map(|strut_type| self.strut_lengths[strut_type])
-                    .sum::<usize>();
+                pixel_index += max_strip;
                 struts_left -= strand.len();
                 continue;
             }
@@ -547,7 +547,7 @@ mod tests {
         );
 
         let encoded = channel.encode_current(0);
-        let device_index = 880;
+        let device_index = 942;
         let byte_index = 4 + device_index * 3;
         assert_eq!(&encoded[byte_index..byte_index + 3], &[0xff, 0, 0]);
     }

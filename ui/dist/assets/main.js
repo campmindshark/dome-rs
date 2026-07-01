@@ -25154,6 +25154,16 @@ function noteActiveVisualizer(visualizer) {
     resetDomeFrameColors();
   }
 }
+function noteStreamedVisualizers(activeVisualizers) {
+  if (!Array.isArray(activeVisualizers)) {
+    return;
+  }
+  const key = activeVisualizers.join("|");
+  if (key !== lastStreamedVisualizers) {
+    lastStreamedVisualizers = key;
+    resetDomeFrameColors();
+  }
+}
 function clearSupportCanvas(canvasElement, canvasContext) {
   if (!canvasElement || !canvasContext) {
     return;
@@ -25334,6 +25344,7 @@ function scheduleSimulatorFrame(frame) {
 function drawSimulatorFrames(frames) {
   const canvasResized = resizeSimulatorCanvas();
   for (const frame of frames) {
+    noteStreamedVisualizers(frame.active_visualizers);
     applyDomeCommands(frame.commands ?? []);
   }
   paintDomeCanvas();
@@ -25531,27 +25542,52 @@ async function refreshPreviewFrame() {
   }
 }
 async function refreshSandboxFrame() {
-  if (!canvas) {
+  if (!canvas || sandboxFrameInFlight) {
     return;
   }
-  updateSandboxControlLabels();
-  noteActiveVisualizer(Number(sandboxActiveVisualizer?.value ?? 0));
-  scheduleSimulatorFrame(await request("/api/simulator/sandbox-frame", {
-    method: "POST",
-    body: JSON.stringify({
-      active_visualizer: Number(sandboxActiveVisualizer?.value ?? 0),
-      volume: Number(sandboxVolume?.value ?? 0.7),
-      beat_progress: Number(sandboxBeatProgress?.value ?? 0.25),
-      flash_active: sandboxFlashActive?.checked ?? true,
-      orientation_override_enabled: sandboxOrientationEnabled?.checked ?? false,
-      orientation_yaw: readNumberInput(sandboxOrientationYaw, 0),
-      orientation_pitch: readNumberInput(sandboxOrientationPitch, -90),
-      orientation_roll: readNumberInput(sandboxOrientationRoll, 0),
-      primary: fromColorInput(sandboxPalettePrimary?.value ?? "#00ff00"),
-      secondary: fromColorInput(sandboxPaletteSecondary?.value ?? "#0080ff"),
-      accent: fromColorInput(sandboxPaletteAccent?.value ?? "#ff4080")
-    })
-  }));
+  sandboxFrameInFlight = true;
+  try {
+    updateSandboxControlLabels();
+    noteActiveVisualizer(Number(sandboxActiveVisualizer?.value ?? 0));
+    scheduleSimulatorFrame(await request("/api/simulator/sandbox-frame", {
+      method: "POST",
+      body: JSON.stringify({
+        active_visualizer: Number(sandboxActiveVisualizer?.value ?? 0),
+        volume: Number(sandboxVolume?.value ?? 0.7),
+        beat_progress: Number(sandboxBeatProgress?.value ?? 0.25),
+        flash_active: sandboxFlashActive?.checked ?? true,
+        orientation_override_enabled: sandboxOrientationEnabled?.checked ?? false,
+        orientation_yaw: readNumberInput(sandboxOrientationYaw, 0),
+        orientation_pitch: readNumberInput(sandboxOrientationPitch, -90),
+        orientation_roll: readNumberInput(sandboxOrientationRoll, 0),
+        primary: fromColorInput(sandboxPalettePrimary?.value ?? "#00ff00"),
+        secondary: fromColorInput(sandboxPaletteSecondary?.value ?? "#0080ff"),
+        accent: fromColorInput(sandboxPaletteAccent?.value ?? "#ff4080")
+      })
+    }));
+  } finally {
+    sandboxFrameInFlight = false;
+  }
+}
+function startSandboxAnimationLoop() {
+  if (!isDedicatedSimulatorPage || sandboxAnimationFrameId !== void 0) {
+    return;
+  }
+  const tick = () => {
+    if (!simulatorStarted) {
+      sandboxAnimationFrameId = void 0;
+      return;
+    }
+    void refreshSandboxFrame();
+    sandboxAnimationFrameId = window.requestAnimationFrame(tick);
+  };
+  sandboxAnimationFrameId = window.requestAnimationFrame(tick);
+}
+function stopSandboxAnimationLoop() {
+  if (sandboxAnimationFrameId !== void 0) {
+    window.cancelAnimationFrame(sandboxAnimationFrameId);
+    sandboxAnimationFrameId = void 0;
+  }
 }
 function updateSandboxControlLabels() {
   if (sandboxVolumeValue && sandboxVolume) {
@@ -25597,6 +25633,7 @@ async function ensureSimulatorStarted() {
       streamStatus.textContent = "simulator sandbox";
     }
     await refreshSandboxFrame();
+    startSandboxAnimationLoop();
   } else {
     scheduleSimulatorFrame(await request("/api/simulator/frame"));
     connectSimulatorStream();
@@ -25606,6 +25643,7 @@ function stopSimulatorPreview() {
   simulatorStarted = false;
   pendingSimulatorFrames = [];
   resetDomeFrameColors();
+  stopSandboxAnimationLoop();
   if (simulatorSocket) {
     simulatorSocket.close();
     simulatorSocket = void 0;
@@ -25642,7 +25680,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioSource, configAudioDeviceHint, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, manualBpm, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxOrientationEnabled, sandboxOrientationYaw, sandboxOrientationYawValue, sandboxOrientationPitch, sandboxOrientationPitchValue, sandboxOrientationRoll, sandboxOrientationRollValue, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, domeLedStrutOffsets, domeFrameColors, latestSimulatorFrame, pendingSimulatorFrames, simulatorPaintQueued, simulatorStarted, simulatorSocket, hostAudioDevices, lastRenderedVisualizer;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioSource, configAudioDeviceHint, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, manualBpm, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxOrientationEnabled, sandboxOrientationYaw, sandboxOrientationYawValue, sandboxOrientationPitch, sandboxOrientationPitchValue, sandboxOrientationRoll, sandboxOrientationRollValue, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, domeLedStrutOffsets, domeFrameColors, latestSimulatorFrame, pendingSimulatorFrames, simulatorPaintQueued, simulatorStarted, simulatorSocket, sandboxAnimationFrameId, sandboxFrameInFlight, hostAudioDevices, lastRenderedVisualizer, lastStreamedVisualizers;
 var init_main = __esm({
   async "main.mjs"() {
     "use strict";
@@ -25747,9 +25785,11 @@ var init_main = __esm({
     pendingSimulatorFrames = [];
     simulatorPaintQueued = false;
     simulatorStarted = false;
+    sandboxFrameInFlight = false;
     hostAudioDevices = null;
     renderPaletteEditor();
     lastRenderedVisualizer = null;
+    lastStreamedVisualizers = null;
     document.querySelector("#start-engine")?.addEventListener("click", async () => {
       updateSnapshot(await request("/api/start", { method: "POST" }));
     });
