@@ -357,11 +357,42 @@ function SimulatorFrameView({ streamText }: { streamText: string }) {
   );
 }
 
+function OrientationPreviewControls({ idPrefix, sandbox = false }: { idPrefix: string; sandbox?: boolean }) {
+  const fieldNamePrefix = sandbox ? 'sandboxOrientation' : 'orientation';
+  return (
+    <fieldset className="orientation-preview-controls">
+      <legend>Orientation Preview</legend>
+      <label className="checkbox-field">
+        <input id={`${idPrefix}-orientation-enabled`} name={`${fieldNamePrefix}Enabled`} type="checkbox" />
+        <span>Use yaw / pitch / roll override</span>
+      </label>
+      <div className="inline-field-grid">
+        <label>
+          Yaw
+          <input id={`${idPrefix}-orientation-yaw`} name={`${fieldNamePrefix}Yaw`} type="range" min="-180" max="180" step="1" defaultValue="0" />
+          <output id={`${idPrefix}-orientation-yaw-value`} htmlFor={`${idPrefix}-orientation-yaw`}>0 deg</output>
+        </label>
+        <label>
+          Pitch
+          <input id={`${idPrefix}-orientation-pitch`} name={`${fieldNamePrefix}Pitch`} type="range" min="-180" max="180" step="1" defaultValue="-90" />
+          <output id={`${idPrefix}-orientation-pitch-value`} htmlFor={`${idPrefix}-orientation-pitch`}>-90 deg</output>
+        </label>
+        <label>
+          Roll
+          <input id={`${idPrefix}-orientation-roll`} name={`${fieldNamePrefix}Roll`} type="range" min="-180" max="180" step="1" defaultValue="0" />
+          <output id={`${idPrefix}-orientation-roll-value`} htmlFor={`${idPrefix}-orientation-roll`}>0 deg</output>
+        </label>
+      </div>
+    </fieldset>
+  );
+}
+
 function LivePreviewPanel() {
   return (
     <section id="preview-drawer" aria-label="Live Preview">
       <h2>Live Preview</h2>
       <p><a href="/simulator">Open isolated simulator</a></p>
+      <OrientationPreviewControls idPrefix="sim" />
       <SimulatorFrameView streamText="preview WebSocket disconnected" />
     </section>
   );
@@ -483,6 +514,7 @@ function SimulatorControls() {
       <label>
         <input id="sandbox-flash-active" name="sandboxFlashActive" type="checkbox" /> Flash overlay active preview
       </label>
+      <OrientationPreviewControls idPrefix="sandbox" sandbox />
       <fieldset>
         <legend>Simulator palette colors</legend>
         <div className="swatches">

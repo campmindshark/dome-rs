@@ -24751,6 +24751,26 @@ function updateStageSideLengthSummary(lengths) {
   const total = lengths.reduce((sum, value) => sum + value, 0);
   configStageSideLengthsSummary.textContent = `${lengths.length} sides \u2022 ${total} pixels total \u2022 min ${Math.min(...lengths)} \u2022 max ${Math.max(...lengths)}`;
 }
+function readNumberInput(input, fallback) {
+  const value = Number(input?.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+function updateOrientationControlLabels(prefix) {
+  const controls = prefix === "sandbox" ? [
+    [sandboxOrientationYaw, sandboxOrientationYawValue],
+    [sandboxOrientationPitch, sandboxOrientationPitchValue],
+    [sandboxOrientationRoll, sandboxOrientationRollValue]
+  ] : [
+    [simOrientationYaw, simOrientationYawValue],
+    [simOrientationPitch, simOrientationPitchValue],
+    [simOrientationRoll, simOrientationRollValue]
+  ];
+  for (const [input, output] of controls) {
+    if (input && output) {
+      output.textContent = `${input.value} deg`;
+    }
+  }
+}
 function updateConfigFromStructuredFields() {
   const config = readConfigEditor();
   config.inputs ??= {};
@@ -24869,6 +24889,19 @@ function updateSnapshot(snapshot) {
   if (simFlashActive) {
     simFlashActive.checked = snapshot.simulator.flash_active;
   }
+  if (simOrientationEnabled) {
+    simOrientationEnabled.checked = Boolean(snapshot.simulator.orientation_override_enabled);
+  }
+  if (simOrientationYaw) {
+    simOrientationYaw.value = String(snapshot.simulator.orientation_yaw);
+  }
+  if (simOrientationPitch) {
+    simOrientationPitch.value = String(snapshot.simulator.orientation_pitch);
+  }
+  if (simOrientationRoll) {
+    simOrientationRoll.value = String(snapshot.simulator.orientation_roll);
+  }
+  updateOrientationControlLabels("sim");
   updatePaletteInputs(snapshot);
 }
 function updateHardwareStatus(element, target) {
@@ -25326,13 +25359,31 @@ async function refreshState() {
   }
 }
 async function patchSimulatorControls() {
+  const body = {};
+  if (simVolume) {
+    body.volume = readNumberInput(simVolume, 0.7);
+  }
+  if (simBeatProgress) {
+    body.beat_progress = readNumberInput(simBeatProgress, 0.25);
+  }
+  if (simFlashActive) {
+    body.flash_active = simFlashActive.checked;
+  }
+  if (simOrientationEnabled) {
+    body.orientation_override_enabled = simOrientationEnabled.checked;
+  }
+  if (simOrientationYaw) {
+    body.orientation_yaw = readNumberInput(simOrientationYaw, 0);
+  }
+  if (simOrientationPitch) {
+    body.orientation_pitch = readNumberInput(simOrientationPitch, -90);
+  }
+  if (simOrientationRoll) {
+    body.orientation_roll = readNumberInput(simOrientationRoll, 0);
+  }
   const snapshot = await request("/api/simulator", {
     method: "PATCH",
-    body: JSON.stringify({
-      volume: Number(simVolume.value),
-      beat_progress: Number(simBeatProgress.value),
-      flash_active: simFlashActive.checked
-    })
+    body: JSON.stringify(body)
   });
   updateSnapshot(snapshot);
   await refreshPreviewFrame();
@@ -25398,6 +25449,10 @@ async function refreshSandboxFrame() {
       volume: Number(sandboxVolume?.value ?? 0.7),
       beat_progress: Number(sandboxBeatProgress?.value ?? 0.25),
       flash_active: sandboxFlashActive?.checked ?? true,
+      orientation_override_enabled: sandboxOrientationEnabled?.checked ?? false,
+      orientation_yaw: readNumberInput(sandboxOrientationYaw, 0),
+      orientation_pitch: readNumberInput(sandboxOrientationPitch, -90),
+      orientation_roll: readNumberInput(sandboxOrientationRoll, 0),
       primary: fromColorInput(sandboxPalettePrimary?.value ?? "#00ff00"),
       secondary: fromColorInput(sandboxPaletteSecondary?.value ?? "#0080ff"),
       accent: fromColorInput(sandboxPaletteAccent?.value ?? "#ff4080")
@@ -25411,6 +25466,7 @@ function updateSandboxControlLabels() {
   if (sandboxBeatProgressValue && sandboxBeatProgress) {
     sandboxBeatProgressValue.textContent = sandboxBeatProgress.value;
   }
+  updateOrientationControlLabels("sandbox");
 }
 async function activateOperatorTab(targetId) {
   for (const button of tabButtons) {
@@ -25487,7 +25543,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, simOrientationEnabled, simOrientationYaw, simOrientationYawValue, simOrientationPitch, simOrientationPitchValue, simOrientationRoll, simOrientationRollValue, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxOrientationEnabled, sandboxOrientationYaw, sandboxOrientationYawValue, sandboxOrientationPitch, sandboxOrientationPitchValue, sandboxOrientationRoll, sandboxOrientationRollValue, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
 var init_main = __esm({
   async "main.mjs"() {
     "use strict";
@@ -25542,6 +25598,13 @@ var init_main = __esm({
     simBeatProgress = document.querySelector("#sim-beat-progress");
     simBeatProgressValue = document.querySelector("#sim-beat-progress-value");
     simFlashActive = document.querySelector("#sim-flash-active");
+    simOrientationEnabled = document.querySelector("#sim-orientation-enabled");
+    simOrientationYaw = document.querySelector("#sim-orientation-yaw");
+    simOrientationYawValue = document.querySelector("#sim-orientation-yaw-value");
+    simOrientationPitch = document.querySelector("#sim-orientation-pitch");
+    simOrientationPitchValue = document.querySelector("#sim-orientation-pitch-value");
+    simOrientationRoll = document.querySelector("#sim-orientation-roll");
+    simOrientationRollValue = document.querySelector("#sim-orientation-roll-value");
     paletteIndex = document.querySelector("#palette-index");
     paletteGrid = document.querySelector("#palette-grid");
     paletteControls = [];
@@ -25561,6 +25624,13 @@ var init_main = __esm({
     sandboxBeatProgress = document.querySelector("#sandbox-beat-progress");
     sandboxBeatProgressValue = document.querySelector("#sandbox-beat-progress-value");
     sandboxFlashActive = document.querySelector("#sandbox-flash-active");
+    sandboxOrientationEnabled = document.querySelector("#sandbox-orientation-enabled");
+    sandboxOrientationYaw = document.querySelector("#sandbox-orientation-yaw");
+    sandboxOrientationYawValue = document.querySelector("#sandbox-orientation-yaw-value");
+    sandboxOrientationPitch = document.querySelector("#sandbox-orientation-pitch");
+    sandboxOrientationPitchValue = document.querySelector("#sandbox-orientation-pitch-value");
+    sandboxOrientationRoll = document.querySelector("#sandbox-orientation-roll");
+    sandboxOrientationRollValue = document.querySelector("#sandbox-orientation-roll-value");
     sandboxPalettePrimary = document.querySelector("#sandbox-palette-primary");
     sandboxPaletteSecondary = document.querySelector("#sandbox-palette-secondary");
     sandboxPaletteAccent = document.querySelector("#sandbox-palette-accent");
@@ -25640,7 +25710,11 @@ var init_main = __esm({
     for (const input of [
       simVolume,
       simBeatProgress,
-      simFlashActive
+      simFlashActive,
+      simOrientationEnabled,
+      simOrientationYaw,
+      simOrientationPitch,
+      simOrientationRoll
     ]) {
       input?.addEventListener("input", async () => {
         if (simVolumeValue) {
@@ -25649,6 +25723,7 @@ var init_main = __esm({
         if (simBeatProgressValue) {
           simBeatProgressValue.textContent = simBeatProgress.value;
         }
+        updateOrientationControlLabels("sim");
         await patchSimulatorControls();
       });
     }
@@ -25657,6 +25732,10 @@ var init_main = __esm({
       sandboxVolume,
       sandboxBeatProgress,
       sandboxFlashActive,
+      sandboxOrientationEnabled,
+      sandboxOrientationYaw,
+      sandboxOrientationPitch,
+      sandboxOrientationRoll,
       sandboxPalettePrimary,
       sandboxPaletteSecondary,
       sandboxPaletteAccent
@@ -25991,10 +26070,38 @@ function SimulatorFrameView({ streamText }) {
     ] })
   ] });
 }
+function OrientationPreviewControls({ idPrefix, sandbox = false }) {
+  const fieldNamePrefix = sandbox ? "sandboxOrientation" : "orientation";
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("fieldset", { className: "orientation-preview-controls", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("legend", { children: "Orientation Preview" }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "checkbox-field", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: `${idPrefix}-orientation-enabled`, name: `${fieldNamePrefix}Enabled`, type: "checkbox" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Use yaw / pitch / roll override" })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "inline-field-grid", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
+        "Yaw",
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: `${idPrefix}-orientation-yaw`, name: `${fieldNamePrefix}Yaw`, type: "range", min: "-180", max: "180", step: "1", defaultValue: "0" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("output", { id: `${idPrefix}-orientation-yaw-value`, htmlFor: `${idPrefix}-orientation-yaw`, children: "0 deg" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
+        "Pitch",
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: `${idPrefix}-orientation-pitch`, name: `${fieldNamePrefix}Pitch`, type: "range", min: "-180", max: "180", step: "1", defaultValue: "-90" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("output", { id: `${idPrefix}-orientation-pitch-value`, htmlFor: `${idPrefix}-orientation-pitch`, children: "-90 deg" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [
+        "Roll",
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: `${idPrefix}-orientation-roll`, name: `${fieldNamePrefix}Roll`, type: "range", min: "-180", max: "180", step: "1", defaultValue: "0" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("output", { id: `${idPrefix}-orientation-roll-value`, htmlFor: `${idPrefix}-orientation-roll`, children: "0 deg" })
+      ] })
+    ] })
+  ] });
+}
 function LivePreviewPanel() {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { id: "preview-drawer", "aria-label": "Live Preview", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Live Preview" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: "/simulator", children: "Open isolated simulator" }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OrientationPreviewControls, { idPrefix: "sim" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SimulatorFrameView, { streamText: "preview WebSocket disconnected" })
   ] });
 }
@@ -26098,6 +26205,7 @@ function SimulatorControls() {
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { id: "sandbox-flash-active", name: "sandboxFlashActive", type: "checkbox" }),
       " Flash overlay active preview"
     ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OrientationPreviewControls, { idPrefix: "sandbox", sandbox: true }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("fieldset", { children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("legend", { children: "Simulator palette colors" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "swatches", children: [

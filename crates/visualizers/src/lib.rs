@@ -194,6 +194,8 @@ pub struct VisualizerInput {
     pub beat_progress: f64,
     /// Runtime frame index for visualizers with Spectrum-style internal motion.
     pub animation_frame: u64,
+    /// Optional yaw/pitch/roll override for simulator-driven orientation previews.
+    pub orientation_override: Option<OrientationOverride>,
     /// Whether a MIDI flash note is active.
     pub flash_active: bool,
     /// Primary operator palette color.
@@ -215,6 +217,7 @@ impl Default for VisualizerInput {
             volume: 0.5,
             beat_progress: 0.25,
             animation_frame: 0,
+            orientation_override: None,
             flash_active: true,
             primary,
             secondary,
@@ -231,6 +234,17 @@ impl Default for VisualizerInput {
             ],
         }
     }
+}
+
+/// Simulator-provided orientation angles in radians.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OrientationOverride {
+    /// Yaw angle in radians.
+    pub yaw: f64,
+    /// Pitch angle in radians.
+    pub pitch: f64,
+    /// Roll angle in radians.
+    pub roll: f64,
 }
 
 /// Deterministic stage visualizer input with Spectrum palette context.
@@ -895,7 +909,12 @@ fn quaternion_paintbrush_frame(input: VisualizerInput) -> Vec<Rgb> {
     // Spectrum's paintbrush idles by integrating yaw/pitch/roll momentum. This
     // stateless port derives a long-period equivalent from runtime frame time so
     // the brush follows a wandering path instead of one fixed beat loop.
-    let orientation = idle_paintbrush_orientation(input);
+    let orientation = input.orientation_override.map_or_else(
+        || idle_paintbrush_orientation(input),
+        |orientation| {
+            Quaternion::from_yaw_pitch_roll(orientation.yaw, orientation.pitch, orientation.roll)
+        },
+    );
     let threshold_factor = 0.25 + f64::from(input.volume.clamp(0.0, 1.0)) + 0.01;
     let threshold = 2.0 / threshold_factor;
     let saturation = (1.3 / f64::from(input.volume.max(0.01)) - 1.0).clamp(0.2, 1.0);
@@ -1312,8 +1331,8 @@ mod tests {
         bar_frame_hash, frame_hash, render_bar_diagnostic, render_dome_diagnostic,
         render_dome_visualizer, render_stage_visualizer, render_stage_visualizer_with_input,
         stage_frame_hash, BarDiagnosticVisualizer, Classification, DiagnosticInput,
-        DomeDiagnosticVisualizer, LiveVisualizer, StageVisualizer, StageVisualizerInput,
-        VisualizerInput, INVENTORY,
+        DomeDiagnosticVisualizer, LiveVisualizer, OrientationOverride, StageVisualizer,
+        StageVisualizerInput, VisualizerInput, INVENTORY,
     };
 
     #[derive(Deserialize)]
@@ -1539,6 +1558,7 @@ mod tests {
             volume: input.volume,
             beat_progress: input.beat_progress,
             animation_frame: 0,
+            orientation_override: None,
             flash_active: input.flash_active,
             primary: palette[0],
             secondary: palette[1],
@@ -1690,6 +1710,36 @@ mod tests {
                 later
             )),
             "idle paintbrush should not retrace a constant path when beat phase is unchanged"
+        );
+    }
+
+    #[test]
+    fn quaternion_paintbrush_uses_orientation_override() {
+        let input = VisualizerInput {
+            volume: 0.6,
+            beat_progress: 0.25,
+            animation_frame: 120,
+            ..VisualizerInput::default()
+        };
+        let overridden = VisualizerInput {
+            orientation_override: Some(OrientationOverride {
+                yaw: std::f64::consts::FRAC_PI_2,
+                pitch: -std::f64::consts::FRAC_PI_4,
+                roll: 0.0,
+            }),
+            ..input
+        };
+
+        assert_ne!(
+            super::frame_hash(&render_dome_visualizer(
+                LiveVisualizer::QuaternionPaintbrush,
+                input
+            )),
+            super::frame_hash(&render_dome_visualizer(
+                LiveVisualizer::QuaternionPaintbrush,
+                overridden
+            )),
+            "manual simulator orientation should steer orientation visualizers"
         );
     }
 

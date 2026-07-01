@@ -38,8 +38,8 @@ use domers_outputs::{
 use domers_visualizers::{
     render_bar_diagnostic, render_dome_diagnostic, render_dome_visualizer, render_stage_visualizer,
     render_stage_visualizer_with_input, BarDiagnosticVisualizer, DiagnosticInput,
-    DomeDiagnosticVisualizer, LiveVisualizer, StageVisualizer, StageVisualizerInput,
-    VisualizerInput,
+    DomeDiagnosticVisualizer, LiveVisualizer, OrientationOverride, StageVisualizer,
+    StageVisualizerInput, VisualizerInput,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "native-capture")]
@@ -362,6 +362,14 @@ pub struct SimulatorControls {
     pub beat_progress: f64,
     /// Whether the flash overlay is active.
     pub flash_active: bool,
+    /// Whether simulator orientation angles override visualizer orientation.
+    pub orientation_override_enabled: bool,
+    /// Simulator yaw angle in degrees.
+    pub orientation_yaw: f64,
+    /// Simulator pitch angle in degrees.
+    pub orientation_pitch: f64,
+    /// Simulator roll angle in degrees.
+    pub orientation_roll: f64,
 }
 
 impl Default for SimulatorControls {
@@ -370,6 +378,10 @@ impl Default for SimulatorControls {
             volume: 0.7,
             beat_progress: 0.25,
             flash_active: false,
+            orientation_override_enabled: false,
+            orientation_yaw: 0.0,
+            orientation_pitch: -90.0,
+            orientation_roll: 0.0,
         }
     }
 }
@@ -385,12 +397,23 @@ impl SimulatorControls {
             volume: self.volume,
             beat_progress: self.beat_progress,
             animation_frame,
+            orientation_override: self.orientation_override(),
             flash_active: self.flash_active,
             primary: palette[0],
             secondary: palette[1],
             accent: palette[2],
             palette,
         }
+    }
+
+    fn orientation_override(self) -> Option<OrientationOverride> {
+        self.orientation_override_enabled.then(|| {
+            orientation_override_from_degrees(
+                self.orientation_yaw,
+                self.orientation_pitch,
+                self.orientation_roll,
+            )
+        })
     }
 }
 
@@ -421,6 +444,10 @@ impl ServerState {
                 volume: 0.7,
                 beat_progress: 0.25,
                 flash_active: false,
+                orientation_override_enabled: false,
+                orientation_yaw: 0.0,
+                orientation_pitch: -90.0,
+                orientation_roll: 0.0,
             },
             inputs: InputRuntime::default(),
             metrics: Metrics {
@@ -509,6 +536,18 @@ impl ServerState {
         }
         if let Some(flash_active) = patch.flash_active {
             self.simulator.flash_active = flash_active;
+        }
+        if let Some(enabled) = patch.orientation_override_enabled {
+            self.simulator.orientation_override_enabled = enabled;
+        }
+        if let Some(yaw) = patch.orientation_yaw {
+            self.simulator.orientation_yaw = clamp_orientation_degrees(yaw);
+        }
+        if let Some(pitch) = patch.orientation_pitch {
+            self.simulator.orientation_pitch = clamp_orientation_degrees(pitch);
+        }
+        if let Some(roll) = patch.orientation_roll {
+            self.simulator.orientation_roll = clamp_orientation_degrees(roll);
         }
     }
 
@@ -2168,7 +2207,7 @@ pub struct PaletteEntryPatch {
     pub color2_enabled: Option<bool>,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
 /// Simulator control patch payload.
 pub struct SimulatorControlsPatch {
     /// Normalized audio volume preview.
@@ -2177,6 +2216,14 @@ pub struct SimulatorControlsPatch {
     pub beat_progress: Option<f64>,
     /// Whether the flash overlay is active.
     pub flash_active: Option<bool>,
+    /// Whether simulator orientation angles override visualizer orientation.
+    pub orientation_override_enabled: Option<bool>,
+    /// Simulator yaw angle in degrees.
+    pub orientation_yaw: Option<f64>,
+    /// Simulator pitch angle in degrees.
+    pub orientation_pitch: Option<f64>,
+    /// Simulator roll angle in degrees.
+    pub orientation_roll: Option<f64>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -2190,6 +2237,14 @@ pub struct SimulatorSandboxRequest {
     pub beat_progress: Option<f64>,
     /// Whether the flash overlay is active.
     pub flash_active: Option<bool>,
+    /// Whether simulator orientation angles override visualizer orientation.
+    pub orientation_override_enabled: Option<bool>,
+    /// Simulator yaw angle in degrees.
+    pub orientation_yaw: Option<f64>,
+    /// Simulator pitch angle in degrees.
+    pub orientation_pitch: Option<f64>,
+    /// Simulator roll angle in degrees.
+    pub orientation_roll: Option<f64>,
     /// Primary preview color encoded as `0xRRGGBB`.
     pub primary: Option<u32>,
     /// Secondary preview color encoded as `0xRRGGBB`.
@@ -2204,6 +2259,13 @@ impl SimulatorSandboxRequest {
             volume: self.volume.unwrap_or(0.7).clamp(0.0, 1.0),
             beat_progress: self.beat_progress.unwrap_or(0.25).clamp(0.0, 1.0),
             animation_frame: 0,
+            orientation_override: self.orientation_override_enabled.unwrap_or(false).then(|| {
+                orientation_override_from_degrees(
+                    self.orientation_yaw.unwrap_or(0.0),
+                    self.orientation_pitch.unwrap_or(-90.0),
+                    self.orientation_roll.unwrap_or(0.0),
+                )
+            }),
             flash_active: self.flash_active.unwrap_or(true),
             primary: domers_core::Rgb::from_u24(self.primary.unwrap_or(0x00_ff_00)),
             secondary: domers_core::Rgb::from_u24(self.secondary.unwrap_or(0x00_80_ff)),
@@ -2594,6 +2656,22 @@ fn brightness_f32(brightness: f64) -> f32 {
     brightness.clamp(0.0, 1.0) as f32
 }
 
+fn orientation_override_from_degrees(yaw: f64, pitch: f64, roll: f64) -> OrientationOverride {
+    OrientationOverride {
+        yaw: clamp_orientation_degrees(yaw).to_radians(),
+        pitch: clamp_orientation_degrees(pitch).to_radians(),
+        roll: clamp_orientation_degrees(roll).to_radians(),
+    }
+}
+
+fn clamp_orientation_degrees(value: f64) -> f64 {
+    if value.is_finite() {
+        value.clamp(-180.0, 180.0)
+    } else {
+        0.0
+    }
+}
+
 fn input_specs(simulator: SimulatorControls) -> [InputSpec; 3] {
     [
         InputSpec {
@@ -2852,6 +2930,7 @@ mod tests {
             volume: None,
             beat_progress: None,
             flash_active: Some(true),
+            ..super::SimulatorControlsPatch::default()
         });
 
         let frame = state.operator_frame();
@@ -3021,6 +3100,10 @@ mod tests {
             volume: Some(0.25),
             beat_progress: Some(0.75),
             flash_active: Some(false),
+            orientation_override_enabled: Some(true),
+            orientation_yaw: Some(90.0),
+            orientation_pitch: Some(-45.0),
+            orientation_roll: Some(270.0),
         });
 
         let snapshot = state.snapshot();
@@ -3028,6 +3111,10 @@ mod tests {
         assert!((snapshot.simulator.volume - 0.25).abs() < f32::EPSILON);
         assert!((snapshot.simulator.beat_progress - 0.75).abs() < f64::EPSILON);
         assert!(!snapshot.simulator.flash_active);
+        assert!(snapshot.simulator.orientation_override_enabled);
+        assert!((snapshot.simulator.orientation_yaw - 90.0).abs() < f64::EPSILON);
+        assert!((snapshot.simulator.orientation_pitch + 45.0).abs() < f64::EPSILON);
+        assert!((snapshot.simulator.orientation_roll - 180.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -3476,6 +3563,7 @@ mod tests {
                 volume: Some(0.25),
                 beat_progress: Some(0.25),
                 flash_active: Some(false),
+                ..super::SimulatorControlsPatch::default()
             })
             .await;
 
@@ -3486,6 +3574,10 @@ mod tests {
                 volume: Some(1.0),
                 beat_progress: Some(0.9),
                 flash_active: Some(true),
+                orientation_override_enabled: Some(true),
+                orientation_yaw: Some(45.0),
+                orientation_pitch: Some(-30.0),
+                orientation_roll: Some(15.0),
                 primary: Some(0xff_00_00),
                 secondary: Some(0x00_ff_00),
                 accent: Some(0x00_00_ff),
