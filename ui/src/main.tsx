@@ -342,14 +342,16 @@ function SimulatorFrameView({ streamText }: { streamText: string }) {
       </section>
       <section aria-label="Simulator">
         <canvas id="dome-simulator" width="750" height="750" data-frame-source="websocket" />
-        <h3>Bar Simulator</h3>
-        <ol id="bar-simulator" className="device-list">
-          <li>none</li>
-        </ol>
-        <h3>Stage Simulator</h3>
-        <ol id="stage-simulator" className="device-list">
-          <li>none</li>
-        </ol>
+        <div className="support-simulator-grid">
+          <section aria-label="Bar Simulator">
+            <h3>Bar Simulator</h3>
+            <canvas id="bar-simulator" className="support-simulator-canvas" width="640" height="220" data-frame-source="websocket" />
+          </section>
+          <section aria-label="Stage Simulator">
+            <h3>Stage Simulator</h3>
+            <canvas id="stage-simulator" className="support-simulator-canvas" width="640" height="360" data-frame-source="websocket" />
+          </section>
+        </div>
       </section>
     </>
   );

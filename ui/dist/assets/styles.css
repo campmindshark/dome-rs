@@ -99,6 +99,19 @@ canvas {
   max-width: calc(100vw - 2rem);
   width: 100%;
 }
+.support-simulator-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  margin-top: 1rem;
+}
+.support-simulator-grid h3 {
+  margin-bottom: 0.35rem;
+}
+.support-simulator-canvas {
+  aspect-ratio: auto;
+  min-height: 10rem;
+}
 output,
 .metric {
   font-variant-numeric: tabular-nums;

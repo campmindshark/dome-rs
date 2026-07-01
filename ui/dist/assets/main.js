@@ -25058,6 +25058,13 @@ function clearCanvas() {
   context.fillStyle = "#000000";
   context.fillRect(0, 0, canvas.width, canvas.height);
 }
+function clearSupportCanvas(canvasElement, canvasContext) {
+  if (!canvasElement || !canvasContext) {
+    return;
+  }
+  canvasContext.fillStyle = "#050505";
+  canvasContext.fillRect(0, 0, canvasElement.width, canvasElement.height);
+}
 function drawFrame(colors) {
   if (!context || !colors.length) {
     return;
@@ -25152,12 +25159,28 @@ function resizeSimulatorCanvas() {
   rebuildDomeLedPoints();
   return true;
 }
+function resizeSupportCanvas(canvasElement, canvasContext, fallbackWidth, fallbackHeight) {
+  if (!canvasElement || !canvasContext) {
+    return false;
+  }
+  const rect = canvasElement.getBoundingClientRect();
+  const width = Math.max(280, Math.round(rect.width || fallbackWidth));
+  const height = Math.max(140, Math.round(rect.height || fallbackHeight));
+  if (canvasElement.width === width && canvasElement.height === height) {
+    return false;
+  }
+  canvasElement.width = width;
+  canvasElement.height = height;
+  return true;
+}
 function redrawLatestSimulatorFrame() {
   if (latestSimulatorFrame) {
     scheduleSimulatorFrame(latestSimulatorFrame);
   } else {
     resizeSimulatorCanvas();
     clearCanvas();
+    drawBarSimulator([]);
+    drawStageSimulator([]);
   }
 }
 function updateSimulatorMetrics(frame) {
@@ -25195,32 +25218,105 @@ function drawSimulatorFrame(frame) {
       drawPixel(command);
     }
   }
-  updateCommandList(barSimulator, frame.bar_commands ?? [], formatBarCommand);
-  updateCommandList(stageSimulator, frame.stage_commands ?? [], formatStageCommand);
+  drawBarSimulator(frame.bar_commands ?? []);
+  drawStageSimulator(frame.stage_commands ?? []);
 }
-function updateCommandList(element, commands, formatter) {
-  if (!element) {
+function drawBarSimulator(commands) {
+  if (!barSimulator || !barContext) {
     return;
   }
-  element.replaceChildren();
-  const visible = commands.filter((command) => command.kind !== "flush").slice(0, 24);
-  if (!visible.length) {
-    const item = document.createElement("li");
-    item.textContent = "none";
-    element.append(item);
+  resizeSupportCanvas(barSimulator, barContext, 640, 220);
+  clearSupportCanvas(barSimulator, barContext);
+  drawCanvasTitle(barContext, "bar + runner output");
+  const pixels = commands.filter((command) => command.kind === "pixel");
+  const maxRunner = Math.max(49, ...pixels.filter((command) => command.is_runner).map((command) => command.led_index));
+  const maxBar = Math.max(49, ...pixels.filter((command) => !command.is_runner).map((command) => command.led_index));
+  drawLedStrip(barContext, {
+    label: "runner",
+    y: barSimulator.height * 0.35,
+    count: maxRunner + 1,
+    colors: pixels.filter((command) => command.is_runner)
+  });
+  drawLedStrip(barContext, {
+    label: "bar",
+    y: barSimulator.height * 0.68,
+    count: maxBar + 1,
+    colors: pixels.filter((command) => !command.is_runner)
+  });
+}
+function drawLedStrip(canvasContext, { label, y, count, colors }) {
+  const marginX = 72;
+  const width = Math.max(1, (barSimulator.width - marginX - 18) / Math.max(1, count));
+  canvasContext.fillStyle = "#bbb";
+  canvasContext.font = "12px system-ui, sans-serif";
+  canvasContext.fillText(label, 14, y + 4);
+  canvasContext.fillStyle = "#1b1b1b";
+  canvasContext.fillRect(marginX, y - 10, barSimulator.width - marginX - 14, 20);
+  for (const command of colors) {
+    const x = marginX + command.led_index * width;
+    canvasContext.fillStyle = toColorInput(command.color);
+    canvasContext.fillRect(Math.round(x), Math.round(y - 8), Math.max(1, Math.ceil(width)), 16);
+  }
+}
+function drawStageSimulator(commands) {
+  if (!stageSimulator || !stageContext) {
     return;
   }
-  for (const command of visible) {
-    const item = document.createElement("li");
-    item.textContent = formatter(command);
-    element.append(item);
+  resizeSupportCanvas(stageSimulator, stageContext, 640, 360);
+  clearSupportCanvas(stageSimulator, stageContext);
+  drawCanvasTitle(stageContext, "stage sides / layers");
+  const pixels = commands.filter((command) => command.kind === "pixel");
+  const sideCount = Math.max(48, ...pixels.map((command) => command.side_index + 1));
+  const sideLength = Math.max(1, ...pixels.map((command) => command.led_index + 1));
+  const centerX = stageSimulator.width / 2;
+  const centerY = stageSimulator.height / 2 + 10;
+  const baseRadius = Math.min(stageSimulator.width, stageSimulator.height) * 0.18;
+  const layerStep = Math.min(stageSimulator.width, stageSimulator.height) * 0.055;
+  drawStageGrid(sideCount, sideLength, centerX, centerY, baseRadius, layerStep);
+  for (const command of pixels) {
+    const point = stagePoint(
+      command.side_index,
+      command.led_index,
+      command.layer_index,
+      sideCount,
+      sideLength,
+      centerX,
+      centerY,
+      baseRadius,
+      layerStep
+    );
+    stageContext.fillStyle = toColorInput(command.color);
+    stageContext.beginPath();
+    stageContext.arc(point.x, point.y, point.size, 0, Math.PI * 2);
+    stageContext.fill();
   }
 }
-function formatBarCommand(command) {
-  return `${command.is_runner ? "runner" : "bar"} led ${command.led_index} ${toColorInput(command.color)}`;
+function drawStageGrid(sideCount, sideLength, centerX, centerY, baseRadius, layerStep) {
+  stageContext.strokeStyle = "#202020";
+  stageContext.lineWidth = 1;
+  for (let side = 0; side < sideCount; side += 1) {
+    const inner = stagePoint(side, 0, 0, sideCount, sideLength, centerX, centerY, baseRadius, layerStep);
+    const outer = stagePoint(side, sideLength - 1, 2, sideCount, sideLength, centerX, centerY, baseRadius, layerStep);
+    stageContext.beginPath();
+    stageContext.moveTo(inner.x, inner.y);
+    stageContext.lineTo(outer.x, outer.y);
+    stageContext.stroke();
+  }
 }
-function formatStageCommand(command) {
-  return `side ${command.side_index} layer ${command.layer_index} led ${command.led_index} ${toColorInput(command.color)}`;
+function stagePoint(sideIndex, ledIndex, layerIndex, sideCount, sideLength, centerX, centerY, baseRadius, layerStep) {
+  const angle = sideIndex / Math.max(1, sideCount) * Math.PI * 2 - Math.PI / 2;
+  const ledProgress = sideLength <= 1 ? 0 : ledIndex / (sideLength - 1);
+  const radius = baseRadius + layerIndex * layerStep + ledProgress * layerStep * 0.75;
+  return {
+    x: centerX + Math.cos(angle) * radius,
+    y: centerY + Math.sin(angle) * radius,
+    size: Math.max(2, Math.min(stageSimulator.width, stageSimulator.height) / 135)
+  };
+}
+function drawCanvasTitle(canvasContext, label) {
+  canvasContext.fillStyle = "#aaa";
+  canvasContext.font = "12px system-ui, sans-serif";
+  canvasContext.fillText(label, 12, 18);
 }
 async function refreshState() {
   const snapshot = await request("/api/state");
@@ -25391,7 +25487,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, stageSimulator, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
 var init_main = __esm({
   async "main.mjs"() {
     "use strict";
@@ -25475,7 +25571,9 @@ var init_main = __esm({
     canvas = document.querySelector("#dome-simulator");
     context = canvas?.getContext("2d");
     barSimulator = document.querySelector("#bar-simulator");
+    barContext = barSimulator?.getContext("2d");
     stageSimulator = document.querySelector("#stage-simulator");
+    stageContext = stageSimulator?.getContext("2d");
     isDedicatedSimulatorPage = document.body?.dataset.page === "simulator";
     SPECTRUM_CANVAS_SIZE = 750;
     SPECTRUM_PROJECTION_OFFSET = 10;
@@ -25880,10 +25978,16 @@ function SimulatorFrameView({ streamText }) {
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Simulator", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("canvas", { id: "dome-simulator", width: "750", height: "750", "data-frame-source": "websocket" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Bar Simulator" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", { id: "bar-simulator", className: "device-list", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "none" }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Stage Simulator" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", { id: "stage-simulator", className: "device-list", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "none" }) })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "support-simulator-grid", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Bar Simulator", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Bar Simulator" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("canvas", { id: "bar-simulator", className: "support-simulator-canvas", width: "640", height: "220", "data-frame-source": "websocket" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { "aria-label": "Stage Simulator", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Stage Simulator" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("canvas", { id: "stage-simulator", className: "support-simulator-canvas", width: "640", height: "360", "data-frame-source": "websocket" })
+        ] })
+      ] })
     ] })
   ] });
 }
