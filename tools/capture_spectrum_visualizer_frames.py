@@ -59,7 +59,7 @@ using Spectrum.LEDs;
 using Spectrum.MIDI;
 using XSerializer;
 
-record CaptureCase(string Case, string Name, string Classification, CaptureInput Input, List<CaptureInput> InputSequence);
+record CaptureCase(string Case, string Name, string Classification, CaptureInput Input, List<CaptureInput> InputSequence, bool HasSequence);
 record CaptureInput(double Volume, double BeatProgress, bool FlashActive, int DiagnosticState, int DiagnosticStep, int PaletteSlot);
 record CaptureResult(string Case, string Name, string Status, string Value, List<string> Frames, string? Error);
 
@@ -274,7 +274,42 @@ static ulong HashVisualizerOutput(SpectrumConfiguration config, object visualize
   return hash;
 }
 
-static List<string> CaptureFrameHashes(SpectrumConfiguration config, CaptureCase testCase) {
+// Fixed anchor for the deterministic capture clock. Any constant works; a real
+// calendar instant just keeps intermediate values realistic.
+static readonly long clockBaseTicks = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
+// Per-frame advance of the deterministic clock. 100000 ticks = 10ms. Override
+// with DOMERS_FRAME_DELTA_TICKS. Recorded in the manifest so Rust reproduces it.
+static long FrameDeltaTicks() {
+  var raw = Environment.GetEnvironmentVariable("DOMERS_FRAME_DELTA_TICKS");
+  if (!string.IsNullOrEmpty(raw) && long.TryParse(raw, out var parsed) && parsed > 0) {
+    return parsed;
+  }
+  return 100000;
+}
+// Fixed synthetic measure length (ms) used when injecting per-frame beat
+// progress. ProgressThroughMeasure resolves to exactly the input beat_progress.
+const long beatMeasureMs = 1000;
+static readonly FieldInfo beatStartField =
+  typeof(BeatBroadcaster).GetField("startingTime", BindingFlags.Instance | BindingFlags.NonPublic)
+    ?? throw new Exception("BeatBroadcaster.startingTime field missing");
+static readonly FieldInfo beatMeasureField =
+  typeof(BeatBroadcaster).GetField("measureLength", BindingFlags.Instance | BindingFlags.NonPublic)
+    ?? throw new Exception("BeatBroadcaster.measureLength field missing");
+
+// Drive BeatBroadcaster progress deterministically for the current clock value:
+// anchor startingTime so that ProgressThroughMeasure == beatProgress at nowTicks.
+static void InjectBeat(SpectrumConfiguration config, long nowTicks, double beatProgress) {
+  var bb = config.beatBroadcaster;
+  long nowMs = nowTicks / TimeSpan.TicksPerMillisecond;
+  long startMs = nowMs - (long)Math.Round(beatProgress * beatMeasureMs);
+  beatMeasureField.SetValue(bb, (int)beatMeasureMs);
+  beatStartField.SetValue(bb, startMs);
+}
+
+// Legacy single-frame path: real wall clock plus the throttle-crossing sleep
+// used by the captured first-frame manifest. Behavior is preserved so those
+// goldens stay reproducible.
+static List<string> CaptureSingleFrame(SpectrumConfiguration config, CaptureCase testCase) {
   ConfigureCase(config, testCase);
   var audio = new AudioInput(config);
   SetAudioVolume(audio, testCase.Input.Volume);
@@ -300,6 +335,53 @@ static List<string> CaptureFrameHashes(SpectrumConfiguration config, CaptureCase
   return values;
 }
 
+// Deterministic multi-frame path: keep a single visualizer instance alive across
+// the whole input_sequence, advancing the injected clock by a fixed per-frame
+// delta and injecting per-frame beat_progress/volume/palette_slot. One Visualize
+// call per entry, hashed with the same scheme as the single-frame capture.
+static List<string> CaptureSequence(SpectrumConfiguration config, CaptureCase testCase) {
+  ConfigureCase(config, testCase);
+  long delta = FrameDeltaTicks();
+  // Pin the clock before constructing anything so construction-time timestamps
+  // (Snakes lastUpdate, Stopwatch starts, Flash animation anchors) are stable.
+  DeterministicClock.OverrideTicks = clockBaseTicks;
+  try {
+    config.beatBroadcaster.Reset();
+    var audio = new AudioInput(config);
+    SetAudioVolume(audio, testCase.Input.Volume);
+    var midi = new MidiInput(config);
+    var orientation = new OrientationInput(config);
+    var dome = new LEDDomeOutput(config);
+    var bar = new LEDBarOutput(config);
+    var stage = new LEDStageOutput(config);
+    var visualizer = CreateVisualizer(testCase.Name, config, audio, midi, orientation, dome, bar, stage);
+    SeedRandomFields(visualizer);
+    ((Visualizer)visualizer).Enabled = true;
+    DrainQueues(config);
+    var values = new List<string>();
+    int frameIndex = 0;
+    foreach (var input in testCase.InputSequence) {
+      long nowTicks = clockBaseTicks + (long)frameIndex * delta;
+      DeterministicClock.OverrideTicks = nowTicks;
+      InjectBeat(config, nowTicks, input.BeatProgress);
+      SetAudioVolume(audio, input.Volume);
+      config.colorPaletteIndex = input.PaletteSlot;
+      ((Visualizer)visualizer).Visualize();
+      values.Add(HashVisualizerOutput(config, visualizer, testCase).ToString());
+      frameIndex++;
+    }
+    return values;
+  } finally {
+    DeterministicClock.OverrideTicks = null;
+  }
+}
+
+static List<string> CaptureFrameHashes(SpectrumConfiguration config, CaptureCase testCase) {
+  return testCase.HasSequence
+    ? CaptureSequence(config, testCase)
+    : CaptureSingleFrame(config, testCase);
+}
+
 static string CaptureHash(SpectrumConfiguration config, CaptureCase testCase) {
   return CaptureFrameHashes(config, testCase)[0];
 }
@@ -312,7 +394,8 @@ static int Main(string[] args) {
   foreach (var item in manifest.GetProperty("cases").EnumerateArray()) {
     var input = item.GetProperty("input");
     var sequence = new List<CaptureInput>();
-    if (item.TryGetProperty("input_sequence", out var inputSequence)) {
+    bool hasSequence = item.TryGetProperty("input_sequence", out var inputSequence);
+    if (hasSequence) {
       foreach (var frameInput in inputSequence.EnumerateArray()) {
         sequence.Add(new CaptureInput(
           frameInput.GetProperty("volume").GetDouble(),
@@ -346,7 +429,8 @@ static int Main(string[] args) {
         input.GetProperty("diagnostic_step").GetInt32(),
         input.GetProperty("palette_slot").GetInt32()
       ),
-      sequence
+      sequence,
+      hasSequence
     ));
   }
 

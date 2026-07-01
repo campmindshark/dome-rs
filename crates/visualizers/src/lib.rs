@@ -344,6 +344,7 @@ pub struct VisualizerRuntime {
     race: Option<RaceRuntime>,
     radial: Option<RadialRuntime>,
     splat: Option<SplatRuntime>,
+    tv_static: Option<TvStaticRuntime>,
 }
 
 impl VisualizerRuntime {
@@ -386,6 +387,10 @@ impl VisualizerRuntime {
                 let runtime = self.splat.get_or_insert_with(SplatRuntime::new);
                 runtime.render(&input, &mut commands);
             }
+            LiveVisualizer::TvStatic => {
+                let runtime = self.tv_static.get_or_insert_with(TvStaticRuntime::new);
+                runtime.render(&mut commands);
+            }
             other => commands.extend(render_dome_visualizer(other, input)),
         }
 
@@ -398,6 +403,38 @@ impl VisualizerRuntime {
         self.race = None;
         self.radial = None;
         self.splat = None;
+        self.tv_static = None;
+    }
+}
+
+/// Persistent TV Static runtime mirroring `LEDDomeTVStaticVisualizer`, which
+/// advances one long-lived `Random` across frames rather than reseeding.
+#[derive(Clone, Debug)]
+struct TvStaticRuntime {
+    rng: DotNetRandom,
+}
+
+impl TvStaticRuntime {
+    fn new() -> Self {
+        Self {
+            rng: DotNetRandom::new(0),
+        }
+    }
+
+    fn render(&mut self, out: &mut Vec<DomeCommand>) {
+        for strut_index in 0..DOME_STRUTS {
+            let Some(strut_length) = dome_strut_length(strut_index) else {
+                continue;
+            };
+            for led_index in 0..strut_length {
+                out.push(DomeCommand::Pixel {
+                    strut_index,
+                    led_index,
+                    color: self.rng.next_color(255),
+                });
+            }
+        }
+        out.push(DomeCommand::Flush);
     }
 }
 
@@ -3921,6 +3958,20 @@ mod tests {
             pixel_commands(&first),
             pixel_commands(&later),
             "Race racers should rotate as wall-clock time advances"
+        );
+    }
+
+    #[test]
+    fn tv_static_advances_persistent_rng_across_frames() {
+        let mut runtime = VisualizerRuntime::default();
+        let first =
+            pixel_commands(&runtime.render_dome(LiveVisualizer::TvStatic, VisualizerInput::default()));
+        let second =
+            pixel_commands(&runtime.render_dome(LiveVisualizer::TvStatic, VisualizerInput::default()));
+        assert_eq!(first.len(), second.len());
+        assert_ne!(
+            first, second,
+            "TV static should keep advancing one RNG, not repeat the same frame"
         );
     }
 
