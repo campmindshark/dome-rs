@@ -2732,12 +2732,16 @@ fn render_operator_frame(
     frame
 }
 
+/// Engine frames per second (2.5 ms per `engine_frame`); Spectrum diagnostics
+/// advance once per second via their `DeterministicStopwatch` (`> 1000 ms`).
+const DIAGNOSTIC_THROTTLE_FRAMES: u64 = 400;
+
 #[allow(
     clippy::cast_possible_truncation,
     reason = "Diagnostic state intentionally wraps to a three-state animation cycle"
 )]
 fn diagnostic_state(frame_index: u64) -> u8 {
-    ((frame_index / 20) % 3) as u8
+    ((frame_index / DIAGNOSTIC_THROTTLE_FRAMES) % 3) as u8
 }
 
 #[allow(
@@ -2745,7 +2749,7 @@ fn diagnostic_state(frame_index: u64) -> u8 {
     reason = "Diagnostic step intentionally wraps to the displayable fixture range"
 )]
 fn diagnostic_step(frame_index: u64) -> usize {
-    (frame_index / 4) as usize
+    (frame_index / DIAGNOSTIC_THROTTLE_FRAMES) as usize
 }
 
 fn live_visualizer_from_name(name: &str) -> Option<LiveVisualizer> {
@@ -3340,18 +3344,26 @@ mod tests {
     }
 
     #[test]
-    fn support_diagnostics_animate_with_runtime_frames() {
+    fn support_diagnostics_animate_at_one_hz_throttle() {
         let mut config = DomersConfig::default();
         config.dome.test_pattern = 2;
         let mut state = ServerState::new(config);
 
         let first = state.operator_frame().dome;
-        for _ in 0..12 {
+        // Spectrum diagnostics only advance once per second; a sub-second step
+        // must leave the frame unchanged.
+        for _ in 0..(super::DIAGNOSTIC_THROTTLE_FRAMES / 2) {
             state.engine_frame();
         }
-        let second = state.operator_frame().dome;
+        let within_second = state.operator_frame().dome;
+        assert_eq!(first, within_second);
 
-        assert_ne!(first, second);
+        // Crossing the one-second throttle advances the diagnostic.
+        for _ in 0..super::DIAGNOSTIC_THROTTLE_FRAMES {
+            state.engine_frame();
+        }
+        let next_second = state.operator_frame().dome;
+        assert_ne!(first, next_second);
     }
 
     #[test]

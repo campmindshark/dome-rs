@@ -14,6 +14,7 @@ import os
 import platform
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import build_spectrum_csharp
@@ -32,6 +33,10 @@ if not CASES.is_absolute():
 RUNNER_DIR = ROOT / "target" / "spectrum-visualizer-capture"
 RUNNER_CSPROJ = RUNNER_DIR / "SpectrumVisualizerCapture.csproj"
 RUNNER_PROGRAM = RUNNER_DIR / "Program.cs"
+
+# FNV-1a offset basis: the hash of a frame with no dome/bar/stage output. A
+# sequence that returns only this value emitted nothing on every frame.
+EMPTY_FRAME_HASH = str(0xCBF29CE484222325)
 
 
 RUNNER_PROJECT = """<Project Sdk="Microsoft.NET.Sdk">
@@ -439,7 +444,19 @@ static int Main(string[] args) {
   foreach (var testCase in cases) {
     try {
       var frames = CaptureFrameHashes(config, testCase);
-      results.Add(new CaptureResult(testCase.Case, testCase.Name, "captured", frames[0], frames, null));
+      // Multi-frame sequences must be reproducible. Recapture and compare so a
+      // visualizer with inherent non-determinism (e.g. an unseeded local
+      // Random the harness cannot seed) is flagged instead of writing a golden
+      // that will never reproduce.
+      if (testCase.HasSequence) {
+        var frames2 = CaptureFrameHashes(config, testCase);
+        if (!frames.SequenceEqual(frames2)) {
+          results.Add(new CaptureResult(testCase.Case, testCase.Name, "nondeterministic", "", new List<string>(),
+            "Sequence hashes differed across repeated captures (visualizer has non-deterministic state the harness cannot control, e.g. an unseeded local Random)."));
+          continue;
+        }
+      }
+      results.Add(new CaptureResult(testCase.Case, testCase.Name, "captured", frames.Count > 0 ? frames[0] : "", frames, null));
     } catch (Exception ex) {
       results.Add(new CaptureResult(testCase.Case, testCase.Name, "failed", "", new List<string>(), ex.GetBaseException().Message));
     }
@@ -518,13 +535,41 @@ def run_capture() -> dict[str, object]:
     return json.loads(result.stdout)
 
 
+def frame_delta_ticks() -> int:
+    raw = os.environ.get("DOMERS_FRAME_DELTA_TICKS", "")
+    if raw:
+        try:
+            parsed = int(raw)
+            if parsed > 0:
+                return parsed
+        except ValueError:
+            pass
+    return 100000
+
+
 def update_manifest(capture: dict[str, object]) -> int:
     manifest = json.loads(CASES.read_text(encoding="utf-8"))
     by_case = {result["Case"]: result for result in capture["results"]}
+    is_sequence_manifest = any(
+        "input_sequence" in case for case in manifest["cases"]
+    )
     failures = 0
     for case in manifest["cases"]:
         result = by_case[case["case"]]
-        if result["Status"] == "captured":
+        frames = result["Frames"] if "input_sequence" in case else []
+        # An all-EMPTY_FRAME_HASH sequence means the visualizer emitted nothing
+        # across every frame: its internal time throttle was never crossed at
+        # this cadence, or it needs input (e.g. MIDI notes) the harness cannot
+        # supply yet. Leave those pending with a reason rather than recording a
+        # misleading "captured" no-output golden. This keeps the decision honest
+        # and is re-run safe.
+        empty_sequence = (
+            result["Status"] == "captured"
+            and "input_sequence" in case
+            and bool(frames)
+            and all(frame == EMPTY_FRAME_HASH for frame in frames)
+        )
+        if result["Status"] == "captured" and not empty_sequence:
             case["expected"]["status"] = "captured"
             if "input_sequence" in case:
                 case["expected"]["frames"] = result["Frames"]
@@ -537,6 +582,24 @@ def update_manifest(capture: dict[str, object]) -> int:
                 for note in case.get("known_unverified", [])
                 if "not captured" not in note and "pending" not in note.lower()
             ]
+        elif empty_sequence:
+            case["expected"]["status"] = "pending_csharp_execution"
+            case["expected"]["frames"] = []
+            case["expected"]["value"] = None
+            case["known_unverified"] = [
+                "Sequence emitted no Spectrum output on every frame at "
+                f"frame_delta_ticks={frame_delta_ticks()}: the visualizer's "
+                "internal time throttle was not crossed within the sequence, or "
+                "it requires input the headless harness does not yet supply "
+                "(e.g. MIDI note state). Left pending until a cadence or input "
+                "that produces motion is defined."
+            ]
+        elif result["Status"] == "nondeterministic":
+            case["expected"]["status"] = "pending_csharp_execution"
+            if "input_sequence" in case:
+                case["expected"]["frames"] = []
+            case["expected"]["value"] = None
+            case["known_unverified"] = [result["Error"]]
         else:
             failures += 1
             case["expected"]["status"] = "capture_failed"
@@ -545,13 +608,36 @@ def update_manifest(capture: dict[str, object]) -> int:
             case["expected"]["value"] = None
             case["known_unverified"] = [f"C# capture failed: {result['Error']}"]
     manifest["capture_tool"] = "tools/capture_spectrum_visualizer_frames.py"
-    manifest["capture_metadata"] = {
-        "source": str((SPECTRUM / "Spectrum" / "spectrum_default_config.xml").relative_to(ROOT.parent)),
-        "runner": str(RUNNER_CSPROJ.relative_to(ROOT)),
-        "command": "python3 tools/capture_spectrum_visualizer_frames.py",
-        "hardware_required": False,
-        "description": "Headless visualizer execution through Spectrum C# classes with simulation-only output.",
-    }
+    if is_sequence_manifest:
+        manifest["capture_metadata"] = {
+            "source": str((SPECTRUM / "Spectrum" / "spectrum_default_config.xml").relative_to(ROOT.parent)),
+            "runner": str(RUNNER_CSPROJ.relative_to(ROOT)),
+            "command": (
+                "DOMERS_VISUALIZER_CASES=fixtures/spectrum-csharp/"
+                "visualizer_sequence_cases.json "
+                "python3 tools/capture_spectrum_visualizer_frames.py"
+            ),
+            "hardware_required": False,
+            "frame_delta_ticks": frame_delta_ticks(),
+            "clock_base_ticks": (date(2020, 1, 1).toordinal() - 1) * 864000000000,
+            "beat_measure_ms": 1000,
+            "description": (
+                "Stateful multi-frame Spectrum visualizer sequences. Each case keeps one "
+                "Spectrum visualizer instance alive across the whole input_sequence, driven "
+                "by an injected deterministic clock (Spectrum.Base.DeterministicClock) that "
+                "starts at clock_base_ticks and advances frame_delta_ticks per frame, with "
+                "per-frame beat_progress injected via a synthetic beat_measure_ms measure. "
+                "Frame hashes use the same FNV-1a scheme as the single-frame capture."
+            ),
+        }
+    else:
+        manifest["capture_metadata"] = {
+            "source": str((SPECTRUM / "Spectrum" / "spectrum_default_config.xml").relative_to(ROOT.parent)),
+            "runner": str(RUNNER_CSPROJ.relative_to(ROOT)),
+            "command": "python3 tools/capture_spectrum_visualizer_frames.py",
+            "hardware_required": False,
+            "description": "Headless visualizer execution through Spectrum C# classes with simulation-only output.",
+        }
     CASES.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return failures
 
