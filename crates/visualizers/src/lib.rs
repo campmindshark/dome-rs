@@ -785,8 +785,63 @@ fn radial_frame(input: VisualizerInput) -> Vec<Rgb> {
     preview_frame(|index| input.palette[((index + offset) / 89) % input.palette.len()])
 }
 
-fn splat_frame(_input: VisualizerInput) -> Vec<Rgb> {
-    vec![Rgb::BLACK; DOME_PIXELS]
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Splat preview clamps normalized brightness before RGB scaling"
+)]
+fn splat_frame(input: VisualizerInput) -> Vec<Rgb> {
+    let adjusted_level = f64::from(input.volume.clamp(0.0, 1.0)).sqrt().clamp(0.1, 1.0);
+    let points = DOME_LED_POINTS.get_or_init(build_dome_led_points);
+    let splats = [
+        Splat {
+            center_x: 0.22,
+            center_y: 0.34,
+            phase_offset: 0.00,
+            color_index: 0,
+        },
+        Splat {
+            center_x: 0.74,
+            center_y: 0.42,
+            phase_offset: 0.31,
+            color_index: 3,
+        },
+        Splat {
+            center_x: 0.46,
+            center_y: 0.76,
+            phase_offset: 0.63,
+            color_index: 6,
+        },
+    ];
+
+    points
+        .iter()
+        .map(|point| {
+            let mut color = Rgb::BLACK;
+            for splat in splats {
+                let age = (input.beat_progress + splat.phase_offset).rem_euclid(1.0);
+                let radius = adjusted_level * (0.06 + 0.24 * age);
+                let distance = distance2(point.x, point.y, splat.center_x, splat.center_y);
+                if distance < radius {
+                    let falloff = 1.0 - distance / radius;
+                    let fade = (1.0 - age).powi(2);
+                    let strength = (falloff * fade).clamp(0.0, 1.0) as f32;
+                    color = light_paint(
+                        color,
+                        input.palette[splat.color_index % input.palette.len()].scale(strength),
+                    );
+                }
+            }
+            color
+        })
+        .collect()
+}
+
+#[derive(Clone, Copy)]
+struct Splat {
+    center_x: f64,
+    center_y: f64,
+    phase_offset: f64,
+    color_index: usize,
 }
 
 fn race_frame(input: VisualizerInput) -> Vec<Rgb> {
@@ -1002,6 +1057,10 @@ fn rotate_yaw_pitch(x: f64, y: f64, z: f64, yaw: f64, pitch: f64) -> (f64, f64, 
 
 fn distance3(ax: f64, ay: f64, az: f64, bx: f64, by: f64, bz: f64) -> f64 {
     ((ax - bx).powi(2) + (ay - by).powi(2) + (az - bz).powi(2)).sqrt()
+}
+
+fn distance2(ax: f64, ay: f64, bx: f64, by: f64) -> f64 {
+    ((ax - bx).powi(2) + (ay - by).powi(2)).sqrt()
 }
 
 #[allow(
@@ -1473,6 +1532,27 @@ mod tests {
     }
 
     #[test]
+    fn splat_preview_renders_fading_blobs() {
+        let commands = render_dome_visualizer(LiveVisualizer::Splat, VisualizerInput::default());
+        let frame = commands
+            .iter()
+            .find_map(|command| match command {
+                DomeCommand::Frame(colors) => Some(colors),
+                DomeCommand::Flush | DomeCommand::Pixel { .. } => None,
+            })
+            .expect("splat visualizer should write a whole preview frame");
+
+        assert_eq!(frame.len(), DOME_PIXELS);
+        assert!(
+            frame
+                .iter()
+                .filter(|color| **color != domers_core::Rgb::BLACK)
+                .count()
+                > 100
+        );
+    }
+
+    #[test]
     fn tv_static_uses_deterministic_varied_noise() {
         let input = VisualizerInput {
             volume: 0.5,
@@ -1508,7 +1588,7 @@ mod tests {
             (LiveVisualizer::Volume, 15_270_928_452_629_649_531),
             (LiveVisualizer::Flash, 14_695_981_039_346_656_037),
             (LiveVisualizer::Radial, 1_809_576_378_694_742_732),
-            (LiveVisualizer::Splat, 12_459_070_695_921_506_308),
+            (LiveVisualizer::Splat, 16_317_372_045_614_077_291),
             (LiveVisualizer::Race, 6_816_113_448_421_016_324),
             (LiveVisualizer::Snakes, 2_228_629_276_110_457_077),
             (LiveVisualizer::QuaternionTest, 13_560_697_347_493_449_988),
