@@ -392,7 +392,6 @@ function LivePreviewPanel() {
     <section id="preview-drawer" aria-label="Live Preview">
       <h2>Live Preview</h2>
       <p><a href="/simulator">Open isolated simulator</a></p>
-      <OrientationPreviewControls idPrefix="sim" />
       <SimulatorFrameView streamText="preview WebSocket disconnected" />
     </section>
   );

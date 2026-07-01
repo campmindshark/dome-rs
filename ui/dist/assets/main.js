@@ -24755,15 +24755,11 @@ function readNumberInput(input, fallback) {
   const value = Number(input?.value);
   return Number.isFinite(value) ? value : fallback;
 }
-function updateOrientationControlLabels(prefix) {
-  const controls = prefix === "sandbox" ? [
+function updateSandboxOrientationControlLabels() {
+  const controls = [
     [sandboxOrientationYaw, sandboxOrientationYawValue],
     [sandboxOrientationPitch, sandboxOrientationPitchValue],
     [sandboxOrientationRoll, sandboxOrientationRollValue]
-  ] : [
-    [simOrientationYaw, simOrientationYawValue],
-    [simOrientationPitch, simOrientationPitchValue],
-    [simOrientationRoll, simOrientationRollValue]
   ];
   for (const [input, output] of controls) {
     if (input && output) {
@@ -24889,19 +24885,6 @@ function updateSnapshot(snapshot) {
   if (simFlashActive) {
     simFlashActive.checked = snapshot.simulator.flash_active;
   }
-  if (simOrientationEnabled) {
-    simOrientationEnabled.checked = Boolean(snapshot.simulator.orientation_override_enabled);
-  }
-  if (simOrientationYaw) {
-    simOrientationYaw.value = String(snapshot.simulator.orientation_yaw);
-  }
-  if (simOrientationPitch) {
-    simOrientationPitch.value = String(snapshot.simulator.orientation_pitch);
-  }
-  if (simOrientationRoll) {
-    simOrientationRoll.value = String(snapshot.simulator.orientation_roll);
-  }
-  updateOrientationControlLabels("sim");
   updatePaletteInputs(snapshot);
 }
 function updateHardwareStatus(element, target) {
@@ -25369,18 +25352,6 @@ async function patchSimulatorControls() {
   if (simFlashActive) {
     body.flash_active = simFlashActive.checked;
   }
-  if (simOrientationEnabled) {
-    body.orientation_override_enabled = simOrientationEnabled.checked;
-  }
-  if (simOrientationYaw) {
-    body.orientation_yaw = readNumberInput(simOrientationYaw, 0);
-  }
-  if (simOrientationPitch) {
-    body.orientation_pitch = readNumberInput(simOrientationPitch, -90);
-  }
-  if (simOrientationRoll) {
-    body.orientation_roll = readNumberInput(simOrientationRoll, 0);
-  }
   const snapshot = await request("/api/simulator", {
     method: "PATCH",
     body: JSON.stringify(body)
@@ -25466,7 +25437,7 @@ function updateSandboxControlLabels() {
   if (sandboxBeatProgressValue && sandboxBeatProgress) {
     sandboxBeatProgressValue.textContent = sandboxBeatProgress.value;
   }
-  updateOrientationControlLabels("sandbox");
+  updateSandboxOrientationControlLabels();
 }
 async function activateOperatorTab(targetId) {
   for (const button of tabButtons) {
@@ -25543,7 +25514,7 @@ function connectSimulatorStream() {
     }
   });
 }
-var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, simOrientationEnabled, simOrientationYaw, simOrientationYawValue, simOrientationPitch, simOrientationPitchValue, simOrientationRoll, simOrientationRollValue, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxOrientationEnabled, sandboxOrientationYaw, sandboxOrientationYawValue, sandboxOrientationPitch, sandboxOrientationPitchValue, sandboxOrientationRoll, sandboxOrientationRollValue, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
+var status, streamStatus, hardwareDome, hardwareStage, activeVisualizer, flashSpeed, flashSpeedValue, domeTestPattern, barTestPattern, stageTestPattern, configEditor, configStatus, configAudioBind, configAudioNativeEnabled, configAudioDeviceId, configMidiBind, configMidiNativeEnabled, configMidiDeviceId, configOrientationBind, configTempoSource, configMadmomCommand, configMadmomTracker, configMadmomAudioIndex, configCarabinerCommand, configCarabinerArgs, configMidiBindings, configDomeEnabled, configDomeSimulationEnabled, configDomeOpcAddress, configDomeBrightnessSlider, configDomeBrightness, configBarEnabled, configBarSimulationEnabled, configBarInfinityLength, configBarInfinityWidth, configBarRunnerLength, configBarBrightnessSlider, configBarBrightness, configStageEnabled, configStageSimulationEnabled, configStageOpcAddress, configStageBrightnessSlider, configStageBrightness, configStageSideLengths, configStageSideLengthsSummary, configStageSideLengthsGrid, simVolume, simVolumeValue, simBeatProgress, simBeatProgressValue, simFlashActive, paletteIndex, paletteGrid, paletteControls, inputAudio, inputMidi, inputMidiLevels, inputOrientation, inputMadmom, inputLink, orientationDevices, midiLog, tempoBpm, tapCounter, sandboxActiveVisualizer, sandboxVolume, sandboxVolumeValue, sandboxBeatProgress, sandboxBeatProgressValue, sandboxFlashActive, sandboxOrientationEnabled, sandboxOrientationYaw, sandboxOrientationYawValue, sandboxOrientationPitch, sandboxOrientationPitchValue, sandboxOrientationRoll, sandboxOrientationRollValue, sandboxPalettePrimary, sandboxPaletteSecondary, sandboxPaletteAccent, metricFrames, metricSimulatorFrames, tabButtons, tabPanels, canvas, context, barSimulator, barContext, stageSimulator, stageContext, isDedicatedSimulatorPage, SPECTRUM_CANVAS_SIZE, SPECTRUM_PROJECTION_OFFSET, SPECTRUM_PROJECTION_SPAN, domeLayout, domeLedPoints, latestSimulatorFrame, pendingSimulatorFrame, simulatorPaintQueued, simulatorStarted, simulatorSocket;
 var init_main = __esm({
   async "main.mjs"() {
     "use strict";
@@ -25598,13 +25569,6 @@ var init_main = __esm({
     simBeatProgress = document.querySelector("#sim-beat-progress");
     simBeatProgressValue = document.querySelector("#sim-beat-progress-value");
     simFlashActive = document.querySelector("#sim-flash-active");
-    simOrientationEnabled = document.querySelector("#sim-orientation-enabled");
-    simOrientationYaw = document.querySelector("#sim-orientation-yaw");
-    simOrientationYawValue = document.querySelector("#sim-orientation-yaw-value");
-    simOrientationPitch = document.querySelector("#sim-orientation-pitch");
-    simOrientationPitchValue = document.querySelector("#sim-orientation-pitch-value");
-    simOrientationRoll = document.querySelector("#sim-orientation-roll");
-    simOrientationRollValue = document.querySelector("#sim-orientation-roll-value");
     paletteIndex = document.querySelector("#palette-index");
     paletteGrid = document.querySelector("#palette-grid");
     paletteControls = [];
@@ -25710,11 +25674,7 @@ var init_main = __esm({
     for (const input of [
       simVolume,
       simBeatProgress,
-      simFlashActive,
-      simOrientationEnabled,
-      simOrientationYaw,
-      simOrientationPitch,
-      simOrientationRoll
+      simFlashActive
     ]) {
       input?.addEventListener("input", async () => {
         if (simVolumeValue) {
@@ -25723,7 +25683,6 @@ var init_main = __esm({
         if (simBeatProgressValue) {
           simBeatProgressValue.textContent = simBeatProgress.value;
         }
-        updateOrientationControlLabels("sim");
         await patchSimulatorControls();
       });
     }
@@ -26101,7 +26060,6 @@ function LivePreviewPanel() {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { id: "preview-drawer", "aria-label": "Live Preview", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "Live Preview" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { href: "/simulator", children: "Open isolated simulator" }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OrientationPreviewControls, { idPrefix: "sim" }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SimulatorFrameView, { streamText: "preview WebSocket disconnected" })
   ] });
 }

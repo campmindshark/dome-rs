@@ -156,6 +156,10 @@ for (const marker of [
     process.exit(1);
   }
 }
+if (app.includes('idPrefix="sim"')) {
+  console.error('Live preview must not expose simulator-only orientation controls');
+  process.exit(1);
+}
 
 for (const marker of [
   'className="opc-targets-footer"',
@@ -261,7 +265,7 @@ for (const marker of [
   'updateInputStatus',
   'updateOrientationDevices',
   'updateMidiLog',
-  'updateOrientationControlLabels',
+  'updateSandboxOrientationControlLabels',
   '/api/dome/geometry',
   '/api/dome/mapping',
   '/api/simulator',

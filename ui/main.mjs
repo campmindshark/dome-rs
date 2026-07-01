@@ -49,13 +49,6 @@ const simVolumeValue = document.querySelector('#sim-volume-value');
 const simBeatProgress = document.querySelector('#sim-beat-progress');
 const simBeatProgressValue = document.querySelector('#sim-beat-progress-value');
 const simFlashActive = document.querySelector('#sim-flash-active');
-const simOrientationEnabled = document.querySelector('#sim-orientation-enabled');
-const simOrientationYaw = document.querySelector('#sim-orientation-yaw');
-const simOrientationYawValue = document.querySelector('#sim-orientation-yaw-value');
-const simOrientationPitch = document.querySelector('#sim-orientation-pitch');
-const simOrientationPitchValue = document.querySelector('#sim-orientation-pitch-value');
-const simOrientationRoll = document.querySelector('#sim-orientation-roll');
-const simOrientationRollValue = document.querySelector('#sim-orientation-roll-value');
 const paletteIndex = document.querySelector('#palette-index');
 const paletteGrid = document.querySelector('#palette-grid');
 let paletteControls = [];
@@ -395,18 +388,12 @@ function readNumberInput(input, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function updateOrientationControlLabels(prefix) {
-  const controls = prefix === 'sandbox'
-    ? [
-        [sandboxOrientationYaw, sandboxOrientationYawValue],
-        [sandboxOrientationPitch, sandboxOrientationPitchValue],
-        [sandboxOrientationRoll, sandboxOrientationRollValue],
-      ]
-    : [
-        [simOrientationYaw, simOrientationYawValue],
-        [simOrientationPitch, simOrientationPitchValue],
-        [simOrientationRoll, simOrientationRollValue],
-      ];
+function updateSandboxOrientationControlLabels() {
+  const controls = [
+    [sandboxOrientationYaw, sandboxOrientationYawValue],
+    [sandboxOrientationPitch, sandboxOrientationPitchValue],
+    [sandboxOrientationRoll, sandboxOrientationRollValue],
+  ];
   for (const [input, output] of controls) {
     if (input && output) {
       output.textContent = `${input.value} deg`;
@@ -534,19 +521,6 @@ function updateSnapshot(snapshot) {
   if (simFlashActive) {
     simFlashActive.checked = snapshot.simulator.flash_active;
   }
-  if (simOrientationEnabled) {
-    simOrientationEnabled.checked = Boolean(snapshot.simulator.orientation_override_enabled);
-  }
-  if (simOrientationYaw) {
-    simOrientationYaw.value = String(snapshot.simulator.orientation_yaw);
-  }
-  if (simOrientationPitch) {
-    simOrientationPitch.value = String(snapshot.simulator.orientation_pitch);
-  }
-  if (simOrientationRoll) {
-    simOrientationRoll.value = String(snapshot.simulator.orientation_roll);
-  }
-  updateOrientationControlLabels('sim');
   updatePaletteInputs(snapshot);
 }
 
@@ -1070,18 +1044,6 @@ async function patchSimulatorControls() {
   if (simFlashActive) {
     body.flash_active = simFlashActive.checked;
   }
-  if (simOrientationEnabled) {
-    body.orientation_override_enabled = simOrientationEnabled.checked;
-  }
-  if (simOrientationYaw) {
-    body.orientation_yaw = readNumberInput(simOrientationYaw, 0);
-  }
-  if (simOrientationPitch) {
-    body.orientation_pitch = readNumberInput(simOrientationPitch, -90);
-  }
-  if (simOrientationRoll) {
-    body.orientation_roll = readNumberInput(simOrientationRoll, 0);
-  }
   const snapshot = await request('/api/simulator', {
     method: 'PATCH',
     body: JSON.stringify(body),
@@ -1173,7 +1135,7 @@ function updateSandboxControlLabels() {
   if (sandboxBeatProgressValue && sandboxBeatProgress) {
     sandboxBeatProgressValue.textContent = sandboxBeatProgress.value;
   }
-  updateOrientationControlLabels('sandbox');
+  updateSandboxOrientationControlLabels();
 }
 
 async function activateOperatorTab(targetId) {
@@ -1330,10 +1292,6 @@ for (const input of [
   simVolume,
   simBeatProgress,
   simFlashActive,
-  simOrientationEnabled,
-  simOrientationYaw,
-  simOrientationPitch,
-  simOrientationRoll,
 ]) {
   input?.addEventListener('input', async () => {
     if (simVolumeValue) {
@@ -1342,7 +1300,6 @@ for (const input of [
     if (simBeatProgressValue) {
       simBeatProgressValue.textContent = simBeatProgress.value;
     }
-    updateOrientationControlLabels('sim');
     await patchSimulatorControls();
   });
 }
