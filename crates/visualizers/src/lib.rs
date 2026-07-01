@@ -1,5 +1,10 @@
 //! Visualizer inventory and porting order.
 
+#![allow(
+    clippy::large_types_passed_by_value,
+    reason = "VisualizerInput is Copy and passed by value throughout the Spectrum port"
+)]
+
 use domers_core::{ColorPalette, PaletteEntry, Rgb};
 use domers_outputs::{
     dome_strut_index_for_control_box, dome_strut_length,
@@ -186,6 +191,11 @@ impl Default for DiagnosticInput {
     }
 }
 
+/// Maximum synthetic MIDI notes replayed on one visualizer frame.
+pub const MAX_FRAME_MIDI_NOTES: usize = 4;
+/// Maximum live orientation devices passed to visualizers per frame.
+pub const MAX_ORIENTATION_DEVICES: usize = 8;
+
 /// Minimal deterministic visualizer input for no-hardware frame tests.
 #[derive(Clone, Copy, Debug)]
 pub struct VisualizerInput {
@@ -201,6 +211,10 @@ pub struct VisualizerInput {
     pub measure_length_ms: Option<u32>,
     /// Optional yaw/pitch/roll override for simulator-driven orientation previews.
     pub orientation_override: Option<OrientationOverride>,
+    /// Live orientation device snapshots (Spectrum `OrientationInput.DevicesSnapshot`).
+    pub orientation_devices: [Option<OrientationDeviceInput>; MAX_ORIENTATION_DEVICES],
+    /// Synthetic or live MIDI note events for this frame (Flash and overlays).
+    pub midi_notes: [Option<MidiNoteInput>; MAX_FRAME_MIDI_NOTES],
     /// Whether a MIDI flash note is active.
     pub flash_active: bool,
     /// Primary operator palette color.
@@ -227,6 +241,8 @@ impl Default for VisualizerInput {
             now_ms: 0,
             measure_length_ms: None,
             orientation_override: None,
+            orientation_devices: [None; MAX_ORIENTATION_DEVICES],
+            midi_notes: [None; MAX_FRAME_MIDI_NOTES],
             flash_active: true,
             primary,
             secondary,
@@ -253,6 +269,26 @@ impl Default for VisualizerInput {
             ],
         }
     }
+}
+
+/// One live orientation device snapshot for wand/poi visualizers.
+#[derive(Clone, Copy, Debug)]
+pub struct OrientationDeviceInput {
+    /// Device id from the datagram.
+    pub device_id: u8,
+    /// Calibrated rotation quaternion (`w`, `x`, `y`, `z`).
+    pub rotation: Quaternion,
+    /// Spectrum action flag (button press state).
+    pub action_flag: u8,
+}
+
+/// One MIDI note event delivered during a frame (`index` = pad, `value` = velocity).
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize)]
+pub struct MidiNoteInput {
+    /// Note/controller index (Flash pads 0–15).
+    pub index: u8,
+    /// Note velocity; `0.0` is note-off.
+    pub value: f64,
 }
 
 /// Simulator-provided orientation angles in radians.
@@ -345,6 +381,8 @@ pub struct VisualizerRuntime {
     radial: Option<RadialRuntime>,
     splat: Option<SplatRuntime>,
     tv_static: Option<TvStaticRuntime>,
+    volume: Option<VolumeRuntime>,
+    flash: Option<FlashRuntime>,
 }
 
 impl VisualizerRuntime {
@@ -391,6 +429,14 @@ impl VisualizerRuntime {
                 let runtime = self.tv_static.get_or_insert_with(TvStaticRuntime::new);
                 runtime.render(&mut commands);
             }
+            LiveVisualizer::Volume => {
+                let runtime = self.volume.get_or_insert_with(VolumeRuntime::new);
+                runtime.render(&input, &mut commands);
+            }
+            LiveVisualizer::Flash => {
+                let runtime = self.flash.get_or_insert_with(FlashRuntime::new);
+                runtime.render(&input, &mut commands);
+            }
             other => commands.extend(render_dome_visualizer(other, input)),
         }
 
@@ -404,6 +450,45 @@ impl VisualizerRuntime {
         self.radial = None;
         self.splat = None;
         self.tv_static = None;
+        self.volume = None;
+        self.flash = None;
+    }
+}
+
+/// Persistent Volume runtime tracking center-offset changes (Spectrum `UpdateCenter`).
+#[derive(Clone, Debug)]
+struct VolumeRuntime {
+    last_center_offset: Option<usize>,
+    seen_frame: bool,
+}
+
+impl VolumeRuntime {
+    fn new() -> Self {
+        Self {
+            last_center_offset: None,
+            seen_frame: false,
+        }
+    }
+
+    fn render(&mut self, input: &VisualizerInput, out: &mut Vec<DomeCommand>) {
+        let beat_progress = if input.animation_frame == 0 {
+            0.0
+        } else {
+            input.beat_progress
+        };
+        let center = volume_center_offset(beat_progress);
+        let center_changed = self.last_center_offset.is_some_and(|last| last != center);
+        let include_initial_wipe = input.animation_frame == 0 && !self.seen_frame;
+        if center_changed && self.seen_frame {
+            out.extend(volume_wipe_commands());
+        }
+        out.extend(volume_commands_with_wipe(
+            *input,
+            beat_progress,
+            include_initial_wipe,
+        ));
+        self.last_center_offset = Some(center);
+        self.seen_frame = true;
     }
 }
 
@@ -438,6 +523,200 @@ impl TvStaticRuntime {
     }
 }
 
+/// One Flash polygon shape built from a concentric strut layout around a hub.
+#[derive(Clone, Debug)]
+struct FlashShape {
+    layout: VolumeStrutLayout,
+    struts: Vec<usize>,
+    animation: Option<FlashPolygonAnimation>,
+}
+
+impl FlashShape {
+    const ENABLED: bool = true;
+
+    fn enabled() -> bool {
+        Self::ENABLED
+    }
+
+    fn available(&self) -> bool {
+        Self::enabled() && self.animation.is_none()
+    }
+}
+
+/// Persistent Flash polygon animation mirroring `PolygonAnimation`.
+#[derive(Clone, Debug)]
+struct FlashPolygonAnimation {
+    pad: u8,
+    velocity: f64,
+    animation_length: u64,
+    starting_time: u64,
+    peak_time: u64,
+    end_time: u64,
+    released: bool,
+}
+
+impl FlashPolygonAnimation {
+    fn new(pad: u8, velocity: f64, measure_length_ms: u32, now_ms: u64) -> Self {
+        let animation_length = u64::from(measure_length_ms) / 4;
+        let starting_time = now_ms;
+        let peak_time = starting_time + (animation_length * 8 / 10);
+        let end_time = starting_time + animation_length;
+        Self {
+            pad,
+            velocity,
+            animation_length,
+            starting_time,
+            peak_time,
+            end_time,
+            released: false,
+        }
+    }
+
+    fn active(&self, now_ms: u64, shape_enabled: bool) -> bool {
+        shape_enabled && (!self.released || self.end_time > now_ms)
+    }
+
+    fn release(&mut self, now_ms: u64) {
+        if self.released {
+            return;
+        }
+        self.released = true;
+        if now_ms > self.peak_time {
+            self.end_time = now_ms + self.animation_length * 2 / 10;
+        }
+    }
+
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "Flash intensity mirrors Spectrum's millisecond timestamp ratios"
+    )]
+    fn intensity(&self, now_ms: u64) -> f64 {
+        if now_ms < self.peak_time {
+            (now_ms.saturating_sub(self.starting_time)) as f64
+                / (self.peak_time.saturating_sub(self.starting_time)) as f64
+        } else if !self.released {
+            1.0
+        } else if now_ms >= self.end_time {
+            0.0
+        } else {
+            1.0 - (now_ms.saturating_sub(self.peak_time)) as f64
+                / (self.end_time.saturating_sub(self.peak_time)) as f64
+        }
+    }
+}
+
+/// Persistent Flash runtime mirroring `LEDDomeFlashVisualizer`.
+#[derive(Clone, Debug)]
+struct FlashRuntime {
+    shapes: Vec<FlashShape>,
+    pads_to_last_animation: [Option<usize>; 16],
+    rng: DotNetRandom,
+    last_user_animation_created: u64,
+}
+
+impl FlashRuntime {
+    fn new() -> Self {
+        let mut shapes = Vec::with_capacity(51);
+        for starting_point in 20..=70 {
+            let layout = concentric_layout_from_point(starting_point, 2);
+            let struts = flash_layout_struts(&layout);
+            shapes.push(FlashShape {
+                layout,
+                struts,
+                animation: None,
+            });
+        }
+        Self {
+            shapes,
+            pads_to_last_animation: [None; 16],
+            rng: DotNetRandom::new(0),
+            last_user_animation_created: 0,
+        }
+    }
+
+    fn render(&mut self, input: &VisualizerInput, out: &mut Vec<DomeCommand>) {
+        let now_ms = input.now_ms;
+        let mut wrote_pixels = false;
+
+        let mut finished_shape_indices = Vec::new();
+        for (shape_index, shape) in self.shapes.iter_mut().enumerate() {
+            let Some(animation) = shape.animation.as_ref() else {
+                continue;
+            };
+            if animation.active(now_ms, FlashShape::enabled()) {
+                continue;
+            }
+            finished_shape_indices.push(shape_index);
+            if self.pads_to_last_animation[animation.pad as usize] == Some(shape_index) {
+                self.pads_to_last_animation[animation.pad as usize] = None;
+            }
+            for &strut_index in &shape.struts {
+                clear_flash_strut(strut_index, out);
+                wrote_pixels = true;
+            }
+            shape.animation = None;
+        }
+
+        let measure_length_ms = input.measure_length_ms.unwrap_or(400);
+        'midi: for note in input.midi_notes.into_iter().flatten() {
+            if note.index > 15 {
+                continue;
+            }
+            let pad = note.index as usize;
+            if let Some(shape_index) = self.pads_to_last_animation[pad] {
+                if let Some(animation) = self.shapes[shape_index].animation.as_mut() {
+                    animation.release(now_ms);
+                }
+                if note.value == 0.0 {
+                    continue;
+                }
+            }
+            let Some(shape_index) = self.random_available_shape_index() else {
+                break 'midi;
+            };
+            let starting_time = now_ms;
+            self.shapes[shape_index].animation = Some(FlashPolygonAnimation::new(
+                note.index,
+                note.value,
+                measure_length_ms,
+                starting_time,
+            ));
+            self.pads_to_last_animation[pad] = Some(shape_index);
+            self.last_user_animation_created = starting_time;
+        }
+
+        for shape in &self.shapes {
+            let Some(animation) = shape.animation.as_ref() else {
+                continue;
+            };
+            if !animation.active(now_ms, FlashShape::enabled()) {
+                continue;
+            }
+            animate_flash_polygon(shape, animation, input, now_ms, out);
+            wrote_pixels = true;
+        }
+
+        if wrote_pixels {
+            out.push(DomeCommand::Flush);
+        }
+    }
+
+    fn random_available_shape_index(&mut self) -> Option<usize> {
+        let available: Vec<usize> = self
+            .shapes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, shape)| shape.available().then_some(index))
+            .collect();
+        if available.is_empty() {
+            return None;
+        }
+        let len = i32::try_from(available.len()).unwrap_or(i32::MAX);
+        let pick = self.rng.next_int(0, len);
+        Some(available[usize::try_from(pick).unwrap_or(0)])
+    }
+}
+
 /// Wall-clock throttled Snakes runtime wrapping the stateful step machine.
 #[derive(Clone, Debug)]
 struct SnakesRuntime {
@@ -455,26 +734,34 @@ impl SnakesRuntime {
 
     fn render(&mut self, input: &VisualizerInput, out: &mut Vec<DomeCommand>) {
         let now = input.now_ms;
-        let steps = match self.last_step_ms {
-            None => 1,
-            Some(last) => u32::try_from(now.saturating_sub(last) / SNAKES_STEP_MS)
-                .unwrap_or(SNAKES_MAX_CATCHUP_STEPS)
-                .min(SNAKES_MAX_CATCHUP_STEPS),
-        };
-        if steps == 0 {
+        if self.last_step_ms.is_none() {
+            // Mirror C# `lastUpdate = DeterministicClock.Now` at construction: the
+            // first frame at the same timestamp does not step.
+            self.last_step_ms = Some(now);
             return;
         }
+        let Some(last) = self.last_step_ms else {
+            return;
+        };
+        if now.saturating_sub(last) < SNAKES_STEP_MS {
+            return;
+        }
+        let steps = u32::try_from(
+            (now.saturating_sub(last) / SNAKES_STEP_MS).min(u64::from(SNAKES_MAX_CATCHUP_STEPS)),
+        )
+        .unwrap_or(SNAKES_MAX_CATCHUP_STEPS);
         for _ in 0..steps {
             self.state.step(&input.palette, out);
         }
+        out.push(DomeCommand::Flush);
         self.last_step_ms = Some(now);
     }
 }
 
 /// Spectrum `domeVolumeRotationSpeed` default used by Race rotation math.
 const RACE_ROTATION_SPEED: f64 = 1.0;
-/// Spectrum `domeRadialSize` default; Race uses it as racer band half-width.
-const RACE_RACER_SPACING: f64 = 0.1;
+/// Spectrum Race band half-width when `domeRadialSize` is 1.0 (see `LEDDomeRaceVisualizer`).
+const RACE_RACER_SPACING: f64 = 1.0;
 
 #[derive(Clone, Copy, Debug)]
 enum RaceRotation {
@@ -584,7 +871,11 @@ struct RaceRuntime {
 impl RaceRuntime {
     fn new() -> Self {
         Self {
-            racers: RACE_RACER_CONFIGS.iter().copied().map(RaceRacer::new).collect(),
+            racers: RACE_RACER_CONFIGS
+                .iter()
+                .copied()
+                .map(RaceRacer::new)
+                .collect(),
             last_ms: None,
         }
     }
@@ -847,14 +1138,13 @@ impl DomeBuffer {
 // diagnostics-cadence follow-up.
 const DOME_GLOBAL_FADE_SPEED: f64 = 0.0;
 const DOME_GLOBAL_HUE_SPEED: f64 = 1.0;
-const DOME_RADIAL_ROTATION_SPEED: f64 = 1.0;
-const DOME_RADIAL_GRADIENT_SPEED: f64 = 1.0;
 const DOME_RADIAL_CENTER_SPEED: f64 = 0.0;
 const DOME_RADIAL_CENTER_ANGLE: f64 = 0.0;
 const DOME_RADIAL_CENTER_DISTANCE: f64 = 0.0;
 const DOME_RADIAL_EFFECT: i32 = 0;
 const DOME_RADIAL_FREQUENCY: f64 = 1.0;
-const DOME_RADIAL_SIZE: f64 = 0.1;
+/// Spectrum `domeRadialSize` from `spectrum_default_config.xml` used for goldens.
+const DOME_RADIAL_SIZE: f64 = 1.0;
 const SPLAT_FADE: f64 = 0.96;
 
 fn polar_to_cartesian(angle: f64, distance: f64) -> (f64, f64) {
@@ -935,12 +1225,12 @@ impl RadialRuntime {
         let progress = input.beat_progress;
         let delta = wrap(progress - self.last_progress, 0.0, 1.0);
         self.current_angle = wrap(
-            self.current_angle + DOME_RADIAL_ROTATION_SPEED * delta * 0.25,
+            self.current_angle + VOLUME_ROTATION_SPEED * delta * 0.25,
             0.0,
             1.0,
         );
         self.current_gradient = wrap(
-            self.current_gradient + DOME_RADIAL_GRADIENT_SPEED * delta,
+            self.current_gradient + VOLUME_GRADIENT_SPEED * delta,
             0.0,
             1.0,
         );
@@ -969,7 +1259,8 @@ impl RadialRuntime {
                 1.0,
             );
             let dist = (px * px + py * py).sqrt();
-            let (val, gradient_val) = radial_effect(DOME_RADIAL_EFFECT, angle, dist, self.current_angle);
+            let (val, gradient_val) =
+                radial_effect(DOME_RADIAL_EFFECT, angle, dist, self.current_angle);
             if val <= size_limit {
                 let color = input.palette_entries[which_gradient].gradient_color(
                     gradient_val,
@@ -1024,11 +1315,8 @@ impl SplatRuntime {
                 let dy = pixel.y - cy;
                 let dist = (dx * dx + dy * dy).sqrt();
                 if dist < radius {
-                    let color = input.palette_entries[color_index].gradient_color(
-                        dist / radius,
-                        0.0,
-                        true,
-                    );
+                    let color =
+                        input.palette_entries[color_index].gradient_color(dist / radius, 0.0, true);
                     pixel.set_color(color);
                 }
             }
@@ -1648,12 +1936,25 @@ fn volume_commands(input: VisualizerInput) -> Vec<DomeCommand> {
     } else {
         input.beat_progress
     };
+    volume_commands_with_wipe(input, beat_progress, input.animation_frame == 0)
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::float_cmp,
+    reason = "Volume port mirrors Spectrum's small integer layout ratios and exact filled-section checks"
+)]
+fn volume_commands_with_wipe(
+    input: VisualizerInput,
+    beat_progress: f64,
+    include_wipe: bool,
+) -> Vec<DomeCommand> {
     let layouts = volume_layouts(volume_center_offset(beat_progress));
     let total_parts = VOLUME_ANIMATION_SIZE;
     let volume_split_into = 2 * ((total_parts - 1) / 2 + 1);
     let level = f64::from(input.volume.clamp(0.0, 1.0));
     let gradient_focus = beat_progress;
-    let mut commands = if input.animation_frame == 0 {
+    let mut commands = if include_wipe {
         volume_wipe_commands()
     } else {
         Vec::new()
@@ -1968,6 +2269,220 @@ fn volume_layouts(center_offset: usize) -> VolumeLayouts {
         part: VolumeStrutLayout::new(spoke_segments),
         section: VolumeStrutLayout::new(circle_segments),
     }
+}
+
+fn concentric_layout_from_point(starting_point: usize, num_layers: usize) -> VolumeStrutLayout {
+    concentric_layout_from_starting_points(&[starting_point], num_layers)
+}
+
+fn concentric_layout_from_starting_points(
+    starting_points: &[usize],
+    num_layers: usize,
+) -> VolumeStrutLayout {
+    let edge_dictionary = volume_edge_dictionary();
+    let mut cur_points_by_group: Vec<Vec<usize>> = starting_points
+        .iter()
+        .copied()
+        .map(|point| vec![point])
+        .collect();
+    let mut segments = Vec::new();
+    let mut used_struts = [false; DOME_STRUTS];
+    let mut layers_left = num_layers;
+
+    while layers_left > 0 {
+        let mut layer1 = Vec::new();
+        let mut next_points_by_group = Vec::new();
+        for group in &cur_points_by_group {
+            let mut new_points = Vec::new();
+            for &point in group {
+                for edge in &edge_dictionary[point] {
+                    if used_struts[edge.strut.index] {
+                        continue;
+                    }
+                    used_struts[edge.strut.index] = true;
+                    push_unique_strut(&mut layer1, edge.strut);
+                    push_unique_usize(&mut new_points, edge.connected_point);
+                }
+            }
+            next_points_by_group.push(new_points);
+        }
+        segments.push(VolumeStrutLayoutSegment { struts: layer1 });
+        layers_left -= 1;
+        if layers_left == 0 {
+            break;
+        }
+
+        cur_points_by_group = next_points_by_group;
+        let mut layer2 = Vec::new();
+        for group in &cur_points_by_group {
+            let Some(mut current_point) = group.first().copied() else {
+                continue;
+            };
+            for &point in group {
+                let connected_count = edge_dictionary[point]
+                    .iter()
+                    .filter(|edge| group.contains(&edge.connected_point))
+                    .count();
+                if connected_count == 1 {
+                    current_point = point;
+                    break;
+                }
+            }
+
+            let mut points_left = group.clone();
+            loop {
+                let mut next_point_in_loop = None;
+                for edge in &edge_dictionary[current_point] {
+                    if !group.contains(&edge.connected_point) || used_struts[edge.strut.index] {
+                        continue;
+                    }
+                    used_struts[edge.strut.index] = true;
+                    push_unique_strut(&mut layer2, edge.strut);
+                    if points_left.contains(&edge.connected_point) {
+                        next_point_in_loop = Some(edge.connected_point);
+                    }
+                    break;
+                }
+                points_left.retain(|point| *point != current_point);
+                if let Some(next_point) = next_point_in_loop {
+                    current_point = next_point;
+                } else {
+                    break;
+                }
+            }
+        }
+        segments.push(VolumeStrutLayoutSegment { struts: layer2 });
+        layers_left -= 1;
+    }
+
+    VolumeStrutLayout::new(segments)
+}
+
+fn flash_layout_struts(layout: &VolumeStrutLayout) -> Vec<usize> {
+    let mut struts = Vec::new();
+    for segment in &layout.segments {
+        for strut in &segment.struts {
+            push_unique_usize(&mut struts, strut.index);
+        }
+    }
+    struts
+}
+
+fn clear_flash_strut(strut_index: usize, out: &mut Vec<DomeCommand>) {
+    let Some(length) = dome_strut_length(strut_index) else {
+        return;
+    };
+    for led_index in 0..length {
+        out.push(DomeCommand::Pixel {
+            strut_index,
+            led_index,
+            color: Rgb::BLACK,
+        });
+    }
+}
+
+#[allow(
+    clippy::cast_precision_loss,
+    clippy::float_cmp,
+    reason = "Flash polygon animation mirrors Spectrum's exact layout ratios and filled-section checks"
+)]
+fn animate_flash_polygon(
+    shape: &FlashShape,
+    animation: &FlashPolygonAnimation,
+    input: &VisualizerInput,
+    now_ms: u64,
+    out: &mut Vec<DomeCommand>,
+) {
+    let intensity = animation.intensity(now_ms);
+    let scale_color = (intensity * 2.0 * animation.velocity).min(1.0);
+    let total_parts = shape.layout.segments.len();
+    let animation_split_into = 2 * ((total_parts - 1) / 2 + 1);
+
+    for part in (0..total_parts).step_by(2) {
+        let start_range = part as f64 / animation_split_into as f64;
+        let end_range = (part + 2) as f64 / animation_split_into as f64;
+        let scaled = if (end_range - start_range).abs() < f64::EPSILON {
+            0.0
+        } else {
+            ((intensity - start_range) / (end_range - start_range)).clamp(0.0, 1.0)
+        };
+        let start_lit_range = if intensity == 0.0 {
+            1.0
+        } else {
+            (start_range / intensity).min(1.0)
+        };
+        let end_lit_range = if intensity == 0.0 {
+            1.0
+        } else {
+            (end_range / intensity).min(1.0)
+        };
+
+        let spoke_segment = &shape.layout.segments[part];
+        for strut in &spoke_segment.struts {
+            let Some(length) = dome_strut_length(strut.index) else {
+                continue;
+            };
+            for led_index in 0..length {
+                let color = volume_gradient_pos(
+                    *strut,
+                    length,
+                    scaled,
+                    start_lit_range,
+                    end_lit_range,
+                    led_index,
+                )
+                .map_or(Rgb::BLACK, |gradient_pos| {
+                    scale_rgb_f64(
+                        flash_pad_gradient_color(input, animation.pad, gradient_pos),
+                        scale_color,
+                    )
+                });
+                out.push(DomeCommand::Pixel {
+                    strut_index: strut.index,
+                    led_index,
+                    color,
+                });
+            }
+        }
+
+        if part + 1 == total_parts {
+            break;
+        }
+
+        let circle_color = if (scaled - 1.0).abs() < f64::EPSILON {
+            scale_rgb_f64(flash_pad_single_color(input, animation.pad), scale_color)
+        } else {
+            Rgb::BLACK
+        };
+        let circle_segment = &shape.layout.segments[part + 1];
+        for strut in &circle_segment.struts {
+            let Some(length) = dome_strut_length(strut.index) else {
+                continue;
+            };
+            for led_index in 0..length {
+                out.push(DomeCommand::Pixel {
+                    strut_index: strut.index,
+                    led_index,
+                    color: circle_color,
+                });
+            }
+        }
+    }
+}
+
+fn flash_pad_single_color(input: &VisualizerInput, pad: u8) -> Rgb {
+    if !input.flash_active {
+        return Rgb::BLACK;
+    }
+    input.palette_entries[pad as usize % input.palette_entries.len()].single_color()
+}
+
+fn flash_pad_gradient_color(input: &VisualizerInput, pad: u8, pixel_pos: f64) -> Rgb {
+    if !input.flash_active {
+        return Rgb::BLACK;
+    }
+    input.palette_entries[pad as usize % input.palette_entries.len()]
+        .gradient_color(pixel_pos, 0.0, false)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -2904,8 +3419,9 @@ fn quaternion_paintbrush_frame(input: VisualizerInput) -> Vec<Rgb> {
         .collect()
 }
 
+/// Unit quaternion used for orientation device input.
 #[derive(Clone, Copy, Debug)]
-struct Quaternion {
+pub struct Quaternion {
     x: f64,
     y: f64,
     z: f64,
@@ -3432,8 +3948,9 @@ mod tests {
         bar_frame_hash, frame_hash, render_bar_diagnostic, render_dome_diagnostic,
         render_dome_visualizer, render_stage_visualizer, render_stage_visualizer_with_input,
         stage_frame_hash, BarDiagnosticVisualizer, Classification, DiagnosticInput,
-        DomeDiagnosticVisualizer, LiveVisualizer, OrientationOverride, StageVisualizer,
-        StageVisualizerInput, VisualizerInput, VisualizerRuntime, INVENTORY,
+        DomeDiagnosticVisualizer, LiveVisualizer, MidiNoteInput, OrientationOverride,
+        StageVisualizer, StageVisualizerInput, VisualizerInput, VisualizerRuntime, INVENTORY,
+        MAX_FRAME_MIDI_NOTES, MAX_ORIENTATION_DEVICES,
     };
 
     fn frame_colors(commands: &[DomeCommand]) -> &[domers_core::Rgb] {
@@ -3465,7 +3982,7 @@ mod tests {
         value: String,
     }
 
-    #[derive(Clone, Copy, Deserialize)]
+    #[derive(Clone, Deserialize)]
     struct ManifestInput {
         volume: f32,
         beat_progress: f64,
@@ -3473,6 +3990,8 @@ mod tests {
         diagnostic_state: u8,
         diagnostic_step: usize,
         palette_slot: u8,
+        #[serde(default)]
+        midi: Vec<MidiNoteInput>,
     }
 
     #[test]
@@ -3539,7 +4058,12 @@ mod tests {
                 visualizer.name
             );
         }
-        assert_eq!(manifest.matches("\"kind\": \"frame_sequence_hashes\"").count(), 11);
+        assert_eq!(
+            manifest
+                .matches("\"kind\": \"frame_sequence_hashes\"")
+                .count(),
+            11
+        );
         assert_eq!(manifest.matches("\"input_sequence\"").count(), 11);
         // Sequence goldens are captured incrementally, so the split between
         // captured and still-pending cases shifts over time; only the total
@@ -3610,6 +4134,8 @@ mod tests {
         name: String,
         expected: SequenceExpected,
         input_sequence: Vec<ManifestInput>,
+        #[serde(default)]
+        frame_delta_ticks: Option<i64>,
     }
 
     #[derive(Deserialize)]
@@ -3674,14 +4200,26 @@ mod tests {
             checked += 1;
 
             let mut runtime = VisualizerRuntime::default();
+            let frame_delta = test_case
+                .frame_delta_ticks
+                .unwrap_or(meta.frame_delta_ticks);
             for (frame_index, frame_input) in test_case.input_sequence.iter().enumerate() {
-                let now_ticks =
-                    meta.clock_base_ticks + (frame_index as i64) * meta.frame_delta_ticks;
+                let now_ticks = meta.clock_base_ticks + (frame_index as i64) * frame_delta;
                 let now_ms = (now_ticks / TICKS_PER_MS) as u64;
 
-                let mut input = visualizer_input(*frame_input, &config);
+                let mut input = visualizer_input(frame_input, &config);
                 input.now_ms = now_ms;
                 input.measure_length_ms = Some(meta.beat_measure_ms);
+                input.animation_frame = u64::try_from(frame_index).expect("frame index fits");
+                input.midi_notes = [None; MAX_FRAME_MIDI_NOTES];
+                for (slot, note) in frame_input
+                    .midi
+                    .iter()
+                    .enumerate()
+                    .take(MAX_FRAME_MIDI_NOTES)
+                {
+                    input.midi_notes[slot] = Some(*note);
+                }
 
                 let commands = runtime.render_dome(visualizer, input);
                 let actual = frame_hash(&commands);
@@ -3712,7 +4250,7 @@ mod tests {
         test_case: &VisualizerCase,
         config: &domers_core::DomersConfig,
     ) -> u64 {
-        let live_input = visualizer_input(test_case.input, config);
+        let live_input = visualizer_input(&test_case.input, config);
         let diagnostic_input = DiagnosticInput {
             state: test_case.input.diagnostic_state,
             step: test_case.input.diagnostic_step,
@@ -3802,7 +4340,7 @@ mod tests {
     }
 
     fn visualizer_input(
-        input: ManifestInput,
+        input: &ManifestInput,
         config: &domers_core::DomersConfig,
     ) -> VisualizerInput {
         let palette = std::array::from_fn(|index| {
@@ -3823,6 +4361,8 @@ mod tests {
             now_ms: 0,
             measure_length_ms: None,
             orientation_override: None,
+            orientation_devices: [None; MAX_ORIENTATION_DEVICES],
+            midi_notes: [None; MAX_FRAME_MIDI_NOTES],
             flash_active: input.flash_active,
             primary: palette[0],
             secondary: palette[1],
@@ -4085,10 +4625,12 @@ mod tests {
     #[test]
     fn tv_static_advances_persistent_rng_across_frames() {
         let mut runtime = VisualizerRuntime::default();
-        let first =
-            pixel_commands(&runtime.render_dome(LiveVisualizer::TvStatic, VisualizerInput::default()));
-        let second =
-            pixel_commands(&runtime.render_dome(LiveVisualizer::TvStatic, VisualizerInput::default()));
+        let first = pixel_commands(
+            &runtime.render_dome(LiveVisualizer::TvStatic, VisualizerInput::default()),
+        );
+        let second = pixel_commands(
+            &runtime.render_dome(LiveVisualizer::TvStatic, VisualizerInput::default()),
+        );
         assert_eq!(first.len(), second.len());
         assert_ne!(
             first, second,

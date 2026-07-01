@@ -427,6 +427,8 @@ impl SimulatorControls {
             accent: palette[2],
             palette,
             palette_entries,
+            midi_notes: [None; 4],
+            orientation_devices: [None; 8],
         }
     }
 
@@ -2770,7 +2772,8 @@ fn live_visualizer_from_name(name: &str) -> Option<LiveVisualizer> {
 
 #[allow(
     clippy::too_many_lines,
-    reason = "This dispatch table keeps Spectrum visualizer names explicit at the runtime boundary"
+    clippy::large_types_passed_by_value,
+    reason = "Dispatch table passes Copy VisualizerInput assembled per frame; size is intentional for parity"
 )]
 fn render_scheduled_visualizer(
     visualizer: &str,
